@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ভোকাবুলারি ডায়েরি</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen">
+
+    <div id="app" class="max-w-md mx-auto p-4">
+        <header class="text-center py-6">
+            <h1 class="text-2xl font-bold text-blue-600">ভোকাবুলারি ডায়েরি</h1>
+        </header>
+
+        <!-- Input Section -->
+        <div id="input-view" class="space-y-4">
+            <textarea id="note-input" class="w-full p-4 h-40 border rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400 outline-none" placeholder="বাক্য লিখুন এবং শব্দটিকে **bold** করুন (যেমন: Learning is **fun**)"></textarea>
+            <button onclick="saveNote()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-blue-700 transition">Save Note</button>
+            
+            <div class="grid grid-cols-3 gap-2 mt-6">
+                <button onclick="startRepeat('today')" class="bg-white p-2 text-xs rounded-lg shadow border border-blue-100">Today</button>
+                <button onclick="startRepeat('week')" class="bg-white p-2 text-xs rounded-lg shadow border border-blue-100">This Week</button>
+                <button onclick="startRepeat('all')" class="bg-white p-2 text-xs rounded-lg shadow border border-blue-100">All Time</button>
+            </div>
+        </div>
+
+        <!-- Repeat Section (Hidden by default) -->
+        <div id="repeat-view" class="hidden text-center">
+            <div id="card-progress" class="mb-4 text-gray-500 font-medium">0 / 0</div>
+            
+            <div id="flashcard" onclick="flipCard()" class="h-64 w-full bg-yellow-50 border-2 border-yellow-200 rounded-2xl flex items-center justify-center p-6 cursor-pointer shadow-xl relative transition-transform duration-500">
+                <div id="card-content" class="text-xl font-semibold text-gray-800 leading-relaxed"></div>
+                <div class="absolute bottom-2 right-4 text-gray-400 text-xs">ক্লিক করে উল্টান</div>
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <button onclick="exitRepeat()" class="text-blue-600 font-bold">Back</button>
+                <button onclick="nextCard()" id="next-btn" class="bg-blue-600 text-white px-8 py-2 rounded-lg shadow">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dictionary Popup -->
+    <div id="dict-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-6">
+        <div class="bg-white p-6 rounded-2xl w-full shadow-2xl relative">
+            <h3 id="dict-word" class="text-xl font-bold text-blue-600 capitalize mb-2"></h3>
+            <p id="dict-meaning" class="text-gray-700 italic"></p>
+            <button onclick="closeModal()" class="mt-4 text-red-500 font-bold w-full text-right">বন্ধ করুন</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
