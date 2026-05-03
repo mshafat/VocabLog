@@ -18,40 +18,61 @@
             </div>
         </header>
 
+        <!-- Settings Section -->
+        <div id="settings-view" class="hidden bg-white p-5 rounded-2xl shadow-xl mb-6 border border-slate-200">
+            <h2 class="font-bold text-lg mb-4">Settings & Data</h2>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Learning</label>
+                        <select id="learn-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none focus:ring-2 focus:ring-indigo-500"></select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Meaning In</label>
+                        <select id="target-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none focus:ring-2 focus:ring-indigo-500"></select>
+                    </div>
+                </div>
+                <hr>
+                <div class="flex flex-col gap-2">
+                    <button onclick="exportData()" class="bg-slate-100 text-slate-700 py-2 rounded-xl text-sm font-bold">📤 Backup Data</button>
+                    <label class="bg-indigo-50 text-indigo-700 py-2 rounded-xl text-sm font-bold text-center cursor-pointer">
+                        📥 Restore Data
+                        <input type="file" id="importFile" class="hidden" onchange="importData(event)">
+                    </label>
+                </div>
+            </div>
+            <button onclick="toggleSettings()" class="mt-4 w-full text-slate-400 text-xs py-2">Close Settings</button>
+        </div>
+
         <!-- Input View -->
         <div id="input-view" class="space-y-4">
             <div class="relative">
-                <!-- Floating Bold Tool -->
                 <button id="bold-tool" onclick="makeBold()" class="hidden absolute -top-10 left-0 bg-slate-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-10 font-bold">
                     Bold Selected
                 </button>
                 <textarea id="note-input" onselect="handleSelection()" class="w-full p-5 h-48 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-lg" placeholder="Paste your sentence here..."></textarea>
             </div>
-            
             <button onclick="saveNote()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">Add to Log</button>
             
-            <!-- Quick Selection Buttons -->
             <div class="pt-6 grid grid-cols-3 gap-3">
-                <button onclick="startRepeat('today')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold uppercase tracking-widest hover:border-indigo-200 transition">Today</button>
-                <button onclick="startRepeat('week')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold uppercase tracking-widest hover:border-indigo-200 transition">Week</button>
-                <button onclick="startRepeat('all')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold uppercase tracking-widest hover:border-indigo-200 transition">All</button>
+                <button onclick="startRepeat('today')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold hover:border-indigo-200">Today</button>
+                <button onclick="startRepeat('week')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold hover:border-indigo-200">Week</button>
+                <button onclick="startRepeat('all')" class="bg-white py-4 text-xs rounded-2xl shadow-sm border font-bold hover:border-indigo-200">All</button>
             </div>
         </div>
 
         <!-- Repeat/Flashcard View -->
         <div id="repeat-view" class="hidden">
             <div class="flex justify-between items-center mb-6 px-2">
-                <div id="card-progress" class="text-slate-400 font-bold text-xs uppercase tracking-widest">0 / 0</div>
-                <button onclick="deleteCurrentCard()" class="text-red-400 font-bold text-xs uppercase">🗑 Delete</button>
+                <div id="card-progress" class="text-slate-400 font-bold text-xs">0 / 0</div>
+                <button onclick="deleteCurrentCard()" class="text-red-400 font-bold text-xs uppercase tracking-widest">🗑 Delete</button>
             </div>
-            
-            <div id="flashcard" onclick="flipCard()" class="h-96 w-full bg-white rounded-[2.5rem] flex flex-col items-center justify-center p-8 cursor-pointer shadow-2xl relative transition-all duration-300 border border-slate-100 overflow-hidden">
-                <div id="card-content" class="text-center leading-relaxed"></div>
+            <div id="flashcard" onclick="flipCard()" class="h-96 w-full bg-white rounded-[2.5rem] flex flex-col items-center justify-center p-8 cursor-pointer shadow-2xl relative border border-slate-100 overflow-hidden">
+                <div id="card-content" class="text-center leading-snug"></div>
                 <div class="absolute bottom-6 text-slate-300 text-[9px] font-black uppercase tracking-[0.3em]">Tap to flip</div>
             </div>
-
             <div class="mt-8 space-y-4">
-                <button onclick="markAsLearned()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition">Mastered ✓</button>
+                <button onclick="markAsLearned()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold shadow-lg">Mastered ✓</button>
                 <div class="flex justify-between items-center px-4">
                     <button onclick="showSection('input')" class="text-slate-400 font-bold text-sm">Exit</button>
                     <button id="next-btn" onclick="nextCard()" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg">Next →</button>
@@ -59,8 +80,23 @@
             </div>
         </div>
 
-        <!-- Settings & Learned sections remain the same (reuse from v1.0) -->
-        <!-- ... (Add v1.0 Settings/Learned/Dict Modal Code here) ... -->
+        <!-- Mastered List View -->
+        <div id="learned-view" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Mastered</h2>
+                <button onclick="showSection('input')" class="text-indigo-600 font-bold text-sm font-bold">Back</button>
+            </div>
+            <div id="learned-list" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- Dictionary Modal -->
+    <div id="dict-modal" class="fixed inset-0 bg-slate-900/40 hidden items-center justify-center p-6 backdrop-blur-md z-50">
+        <div class="bg-white p-8 rounded-[2rem] w-full max-w-xs shadow-2xl">
+            <h3 id="dict-word" class="text-2xl font-black text-indigo-600 mb-2 truncate uppercase"></h3>
+            <p id="dict-meaning" class="text-slate-600 text-lg leading-relaxed"></p>
+            <button onclick="closeModal()" class="mt-8 w-full bg-slate-100 text-slate-500 py-3 rounded-xl font-bold">Got it</button>
+        </div>
     </div>
 
     <script src="script.js"></script>
