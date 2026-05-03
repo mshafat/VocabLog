@@ -1,0 +1,19 @@
+body {
+    -webkit-tap-highlight-color: transparent;
+}
+
+#flashcard {
+    perspective: 1000px;
+    transition: transform 0.3s;
+}
+
+#flashcard:active {
+    transform: scale(0.98);
+}
+
+.word-btn {
+    color: #2563eb;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: bold;
+}
