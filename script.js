@@ -29,7 +29,7 @@ window.onload = () => {
     tSel.value = localStorage.getItem('pref_target') || "bn";
 };
 
-// Selection and Tool
+// Selection Logic
 function handleSelection() {
     const sel = window.getSelection();
     const btn = document.getElementById('bold-tool');
@@ -66,7 +66,7 @@ function saveNote() {
     input.innerHTML = ""; alert("Card saved!");
 }
 
-// FIX: Improved Session Logic for Buttons
+// Session Flow
 function startRepeat(mode) {
     currentSessionCards = [];
     isReviewingMastered = (mode === 'mastered');
@@ -80,9 +80,7 @@ function startRepeat(mode) {
 
         Object.values(notes).forEach(dayCards => {
             dayCards.forEach(card => {
-                // Skip if already learned
                 if(learnedWords.some(lw => lw.id === card.id)) return;
-
                 const age = now - (card.timestamp || 0);
                 if (mode === 'today' && age <= oneDay) currentSessionCards.push(card);
                 else if (mode === 'week' && age <= oneWeek) currentSessionCards.push(card);
@@ -91,19 +89,15 @@ function startRepeat(mode) {
         });
     }
 
-    if (currentSessionCards.length === 0) {
-        return alert("No cards found for this selection!");
-    }
-
+    if (currentSessionCards.length === 0) return alert("No cards found!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
-    
     showCard();
     showSection('repeat');
 }
 
-// Rendering Logic (FIX: Resolves issues in Screenshot_20260506_001333.png)
+// Rendering Logic (FIX: Highlight word dictionary & flip prevention)
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
@@ -115,17 +109,18 @@ function showCard() {
         const safeWord = card.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${safeWord})`, 'gi');
         
-        // Marker based safe replacement
         const masked = sentence.replace(regex, "___MARK___$1___END___");
         const parts = masked.split(/\s+/);
         
         content.innerHTML = parts.map(p => {
+            const cleanText = p.replace("___MARK___", "").replace("___END___", "");
+            const dictionaryWord = cleanText.replace(/[.,!?।]/g, "");
+            
             if (p.includes("___MARK___")) {
-                const wordOnly = p.replace("___MARK___", "").replace("___END___", "");
-                return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 dark:text-white px-1 rounded font-bold italic">${wordOnly}</mark>`;
+                // ADDED: onclick for Highlighted word to lookup without flipping
+                return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 dark:text-white px-1 rounded font-bold italic cursor-pointer" onclick="lookup('${dictionaryWord}')">${cleanText}</mark>`;
             }
-            const clean = p.replace(/[.,!?।]/g, "");
-            return `<span class="cursor-pointer text-indigo-500 dark:text-indigo-400 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
+            return `<span class="cursor-pointer text-indigo-500 dark:text-indigo-400 hover:underline" onclick="lookup('${dictionaryWord}')">${p}</span>`;
         }).join(" ");
         
         content.className = "text-2xl font-semibold text-slate-700 dark:text-slate-300 leading-snug";
@@ -153,15 +148,14 @@ function deleteCurrentCard() {
     const cardId = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== cardId);
     if (isReviewingMastered) learnedWords = learnedWords.filter(c => c.id !== cardId);
-    
     localStorage.setItem('vocab_notes', JSON.stringify(notes));
     localStorage.setItem('learned_words', JSON.stringify(learnedWords));
-    
     currentSessionCards.splice(currentIndex, 1);
     if (currentSessionCards.length === 0) showSection('input');
     else { if(currentIndex >= currentSessionCards.length) currentIndex = 0; isFlipped = false; showCard(); }
 }
 
+// UI Controls
 function showSection(s) {
     document.querySelectorAll('#input-view, #repeat-view, #learned-view, #settings-view').forEach(e => e.classList.add('hidden'));
     if(s==='learned') renderLearnedList();
@@ -180,7 +174,9 @@ function renderLearnedList() {
 }
 
 async function lookup(word) {
-    event.stopPropagation();
+    // CRITICAL: Stop propagation so flipCard() isn't triggered
+    if (window.event) window.event.stopPropagation();
+    
     const modal = document.getElementById('dict-modal');
     document.getElementById('dict-word').innerText = "Searching...";
     modal.classList.replace('hidden', 'flex');
