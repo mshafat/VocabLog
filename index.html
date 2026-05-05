@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VocabLog v1.1</title>
+    <title>VocabLog v1.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -11,7 +11,10 @@
 
     <div id="app" class="max-w-md mx-auto p-4 pb-10">
         <header class="flex justify-between items-center py-6">
-            <h1 class="text-2xl font-black text-indigo-600">VocabLog <span class="text-[10px] bg-indigo-100 px-2 py-0.5 rounded ml-1">v1.1</span></h1>
+            <!-- Logo with Landing Page Link -->
+            <h1 onclick="showSection('input')" class="text-2xl font-black text-indigo-600 cursor-pointer select-none">
+                VocabLog <span class="text-[10px] bg-indigo-100 px-2 py-0.5 rounded ml-1">v1.2</span>
+            </h1>
             <div class="space-x-3">
                 <button onclick="showSection('learned')" class="text-sm font-medium text-slate-500">Learned</button>
                 <button onclick="toggleSettings()" class="text-xl">⚙️</button>
@@ -25,16 +28,16 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="text-[10px] font-bold text-slate-400 uppercase">Learning</label>
-                        <select id="learn-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none focus:ring-2 focus:ring-indigo-500"></select>
+                        <select id="learn-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none"></select>
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-slate-400 uppercase">Meaning In</label>
-                        <select id="target-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none focus:ring-2 focus:ring-indigo-500"></select>
+                        <select id="target-lang" class="w-full p-2 bg-slate-50 rounded-lg text-sm border-none"></select>
                     </div>
                 </div>
                 <hr>
                 <div class="flex flex-col gap-2">
-                    <button onclick="exportData()" class="bg-slate-100 text-slate-700 py-2 rounded-xl text-sm font-bold">📤 Backup Data</button>
+                    <button onclick="exportData()" class="bg-slate-100 text-slate-700 py-2 rounded-xl text-sm font-bold tracking-tight">📤 Backup Data</button>
                     <label class="bg-indigo-50 text-indigo-700 py-2 rounded-xl text-sm font-bold text-center cursor-pointer">
                         📥 Restore Data
                         <input type="file" id="importFile" class="hidden" onchange="importData(event)">
@@ -44,13 +47,13 @@
             <button onclick="toggleSettings()" class="mt-4 w-full text-slate-400 text-xs py-2">Close Settings</button>
         </div>
 
-        <!-- Input View -->
+        <!-- Input View (Landing Page) -->
         <div id="input-view" class="space-y-4">
             <div class="relative">
                 <button id="bold-tool" onclick="makeBold()" class="hidden absolute -top-10 left-0 bg-slate-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-10 font-bold">
                     Bold Selected
                 </button>
-                <textarea id="note-input" onselect="handleSelection()" class="w-full p-5 h-48 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-lg" placeholder="Paste your sentence here..."></textarea>
+                <textarea id="note-input" onselect="handleSelection()" class="w-full p-5 h-48 bg-white border border-slate-200 rounded-3xl shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all text-lg" placeholder="Paste your text here..."></textarea>
             </div>
             <button onclick="saveNote()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">Add to Log</button>
             
@@ -61,21 +64,33 @@
             </div>
         </div>
 
-        <!-- Repeat/Flashcard View -->
+        <!-- Repeat View -->
         <div id="repeat-view" class="hidden">
             <div class="flex justify-between items-center mb-6 px-2">
                 <div id="card-progress" class="text-slate-400 font-bold text-xs">0 / 0</div>
-                <button onclick="deleteCurrentCard()" class="text-red-400 font-bold text-xs uppercase tracking-widest">🗑 Delete</button>
+                <button onclick="deleteCurrentCard()" class="text-red-300 hover:text-red-500 font-bold text-[10px] uppercase tracking-widest">🗑 Delete</button>
             </div>
+
             <div id="flashcard" onclick="flipCard()" class="h-96 w-full bg-white rounded-[2.5rem] flex flex-col items-center justify-center p-8 cursor-pointer shadow-2xl relative border border-slate-100 overflow-hidden">
                 <div id="card-content" class="text-center leading-snug"></div>
                 <div class="absolute bottom-6 text-slate-300 text-[9px] font-black uppercase tracking-[0.3em]">Tap to flip</div>
             </div>
-            <div class="mt-8 space-y-4">
-                <button onclick="markAsLearned()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold shadow-lg">Mastered ✓</button>
-                <div class="flex justify-between items-center px-4">
-                    <button onclick="showSection('input')" class="text-slate-400 font-bold text-sm">Exit</button>
-                    <button id="next-btn" onclick="nextCard()" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg">Next →</button>
+
+            <!-- Navigation and Mastered Buttons -->
+            <div class="mt-8 space-y-6">
+                <div class="flex justify-between items-center px-2">
+                    <button onclick="prevCard()" id="prev-btn" class="text-indigo-600 font-bold text-sm disabled:opacity-30">← Previous</button>
+                    <button id="next-btn" onclick="nextCard()" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg">Next Card →</button>
+                </div>
+                
+                <div class="flex justify-center pt-2">
+                    <button onclick="markAsLearned()" class="text-emerald-500 font-bold text-xs uppercase tracking-widest border-b border-emerald-200 pb-0.5 hover:text-emerald-700 transition">
+                        ✓ Mark as Mastered
+                    </button>
+                </div>
+
+                <div class="text-center pt-4">
+                    <button onclick="showSection('input')" class="text-slate-400 font-bold text-xs uppercase tracking-widest">Exit Session</button>
                 </div>
             </div>
         </div>
@@ -83,14 +98,14 @@
         <!-- Mastered List View -->
         <div id="learned-view" class="hidden">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Mastered</h2>
-                <button onclick="showSection('input')" class="text-indigo-600 font-bold text-sm font-bold">Back</button>
+                <h2 class="text-xl font-bold">Mastered Words</h2>
+                <button onclick="showSection('input')" class="text-indigo-600 font-bold text-sm">Home</button>
             </div>
             <div id="learned-list" class="space-y-3"></div>
         </div>
     </div>
 
-    <!-- Dictionary Modal -->
+    <!-- Dictionary Modal (Same as before) -->
     <div id="dict-modal" class="fixed inset-0 bg-slate-900/40 hidden items-center justify-center p-6 backdrop-blur-md z-50">
         <div class="bg-white p-8 rounded-[2rem] w-full max-w-xs shadow-2xl">
             <h3 id="dict-word" class="text-2xl font-black text-indigo-600 mb-2 truncate uppercase"></h3>
