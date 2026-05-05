@@ -3,23 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VocabLog v1.4</title>
+    <title>VocabLog v1.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // Tailwind dark mode configuration
         tailwind.config = { darkMode: 'class' }
     </script>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        .rtl-auto { unicode-bidi: plaintext; text-align: start; }
+        .vocab-word { cursor: pointer; }
+    </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 font-sans min-h-screen text-slate-800 dark:text-slate-200 transition-colors duration-300">
 
     <div id="app" class="max-w-md mx-auto p-4 pb-10">
         <header class="flex justify-between items-center py-6">
             <h1 onclick="showSection('input')" class="text-2xl font-black text-indigo-600 cursor-pointer select-none">
-                VocabLog <span class="text-[10px] bg-indigo-100 dark:bg-indigo-900 px-2 py-0.5 rounded ml-1">v1.4</span>
+                VocabLog <span class="text-[10px] bg-indigo-100 dark:bg-indigo-900 px-2 py-0.5 rounded ml-1">v1.5</span>
             </h1>
             <div class="flex items-center space-x-4">
-                <!-- One-Tap Theme Toggle -->
+                <!-- Theme Toggle -->
                 <button onclick="toggleTheme()" class="text-xl bg-white dark:bg-slate-800 w-10 h-10 rounded-full shadow-sm flex items-center justify-center border border-slate-200 dark:border-slate-700 active:scale-90 transition-transform">
                     <span id="theme-icon">🌙</span>
                 </button>
@@ -28,21 +30,20 @@
             </div>
         </header>
 
-        <!-- Input View (Landing Page) -->
+        <!-- Input View -->
         <div id="input-view" class="space-y-4">
             <div class="relative">
-                <button id="bold-tool" onclick="makeBold()" class="hidden absolute -top-12 left-0 bg-indigo-600 text-white text-xs px-4 py-2 rounded-full shadow-lg z-20 font-bold animate-pulse">
+                <button id="bold-tool" onclick="makeBold()" class="hidden absolute -top-12 left-0 bg-indigo-600 text-white text-xs px-4 py-2 rounded-full shadow-lg z-20 font-bold">
                     ✨ Highlight Word
                 </button>
-                <div id="note-input" contenteditable="true" oninput="handleInput()" onselect="handleSelection()" onmouseup="handleSelection()" class="w-full p-6 min-h-[220px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all text-xl leading-relaxed overflow-y-auto rtl-auto" placeholder="Paste or type text here..."></div>
+                <div id="note-input" contenteditable="true" onselect="handleSelection()" onmouseup="handleSelection()" class="w-full p-6 min-h-[220px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all text-xl leading-relaxed overflow-y-auto rtl-auto" placeholder="Paste or type text here..."></div>
             </div>
-            
             <button onclick="saveNote()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">Save Card</button>
             
             <div class="pt-6 grid grid-cols-3 gap-3">
-                <button onclick="startRepeat('today')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold hover:border-indigo-400">Today</button>
-                <button onclick="startRepeat('week')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold hover:border-indigo-400">Week</button>
-                <button onclick="startRepeat('all')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold hover:border-indigo-400">All</button>
+                <button onclick="startRepeat('today')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold">Today</button>
+                <button onclick="startRepeat('week')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold">Week</button>
+                <button onclick="startRepeat('all')" class="bg-white dark:bg-slate-900 py-4 text-xs rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 font-bold">All</button>
             </div>
         </div>
 
@@ -52,20 +53,17 @@
                 <div id="card-progress" class="text-slate-400 font-bold text-xs">0 / 0</div>
                 <button onclick="deleteCurrentCard()" class="text-red-400 font-bold text-[10px] uppercase">🗑 Delete</button>
             </div>
-
-            <div id="flashcard" onclick="flipCard()" class="h-96 w-full bg-white dark:bg-slate-900 rounded-[2.5rem] flex flex-col items-center justify-center p-8 cursor-pointer shadow-2xl relative border border-slate-100 dark:border-slate-800 overflow-hidden transition-all duration-300">
+            <div id="flashcard" onclick="flipCard()" class="h-96 w-full bg-white dark:bg-slate-900 rounded-[2.5rem] flex flex-col items-center justify-center p-8 cursor-pointer shadow-2xl relative border border-slate-100 dark:border-slate-800 overflow-hidden active:scale-95 transition-transform">
                 <div id="card-content" class="text-center leading-relaxed w-full rtl-auto"></div>
                 <div class="absolute bottom-6 text-slate-300 dark:text-slate-600 text-[9px] font-black uppercase tracking-[0.3em]">Tap to flip</div>
             </div>
-
             <div class="mt-8 space-y-6">
                 <div class="flex justify-between items-center px-2">
-                    <button onclick="prevCard()" id="prev-btn" class="text-indigo-600 dark:text-indigo-400 font-bold text-sm disabled:opacity-30">← Previous</button>
+                    <button onclick="prevCard()" id="prev-btn" class="text-indigo-600 font-bold text-sm disabled:opacity-30">← Previous</button>
                     <button id="next-btn" onclick="nextCard()" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg">Next →</button>
                 </div>
-                
                 <div class="flex justify-center pt-2">
-                    <button onclick="markAsLearned()" class="text-emerald-500 font-bold text-xs uppercase tracking-widest border-b border-emerald-200 dark:border-emerald-900 pb-0.5">✓ Mastered</button>
+                    <button id="master-btn" onclick="markAsLearned()" class="text-emerald-500 font-bold text-xs uppercase tracking-widest border-b border-emerald-200 dark:border-emerald-900 pb-0.5">✓ Mastered</button>
                 </div>
             </div>
         </div>
@@ -76,6 +74,10 @@
                 <h2 class="text-xl font-bold">Mastered Words</h2>
                 <button onclick="showSection('input')" class="text-indigo-600 font-bold text-sm">Home</button>
             </div>
+            <!-- Mastered Review Button -->
+            <button onclick="startRepeat('mastered')" class="w-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 py-4 rounded-2xl font-bold mb-6 border border-indigo-100 dark:border-indigo-800/50 shadow-sm active:scale-95 transition-all">
+                🔄 Review Mastered Cards
+            </button>
             <div id="learned-list" class="space-y-3"></div>
         </div>
 
@@ -100,8 +102,8 @@
     <!-- Dictionary Modal -->
     <div id="dict-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center p-6 backdrop-blur-sm z-50">
         <div class="bg-white dark:bg-slate-900 p-8 rounded-[2rem] w-full max-w-xs shadow-2xl">
-            <h3 id="dict-word" class="text-2xl font-black text-indigo-600 mb-2 truncate uppercase"></h3>
-            <p id="dict-meaning" class="text-slate-600 dark:text-slate-400 text-lg leading-relaxed"></p>
+            <h3 id="dict-word" class="text-2xl font-black text-indigo-600 mb-2 uppercase"></h3>
+            <p id="dict-meaning" class="text-slate-600 dark:text-slate-400 text-lg"></p>
             <button onclick="closeModal()" class="mt-8 w-full bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-bold">Close</button>
         </div>
     </div>
