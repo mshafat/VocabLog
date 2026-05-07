@@ -7,12 +7,13 @@ let currentIndex = 0;
 let isFlipped = false;
 let isReviewingMastered = false;
 
-// Theme Logic
+// --- Theme Logic ---
 function applyTheme() {
     const saved = localStorage.getItem('theme');
     const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', isDark);
-    document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
+    const themeIcon = document.getElementById('theme-icon');
+    if (themeIcon) themeIcon.innerText = isDark ? '☀️' : '🌙';
 }
 
 function toggleTheme() {
@@ -24,21 +25,42 @@ function toggleTheme() {
 window.onload = () => {
     applyTheme();
     const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
-    Object.entries(languages).forEach(([c, n]) => {
-        lSel.add(new Option(n, c));
-        tSel.add(new Option(n, c));
+    Object.entries(languages).forEach(([c, n]) => { 
+        lSel.add(new Option(n, c)); 
+        tSel.add(new Option(n, c)); 
     });
-
-    // Default or Saved Prefs
+    
     lSel.value = localStorage.getItem('pref_learn') || "ur";
     tSel.value = localStorage.getItem('pref_target') || "bn";
 
-    // Auto-save settings on change
     lSel.onchange = () => localStorage.setItem('pref_learn', lSel.value);
     tSel.onchange = () => localStorage.setItem('pref_target', tSel.value);
 };
 
-// Selection logic for Highlighting
+// --- AUDIO PRONUNCIATION (Online Google TTS Method) ---
+function speakText(event) {
+    if (event) event.stopPropagation(); 
+    
+    const card = currentSessionCards[currentIndex];
+    const textToSpeak = isFlipped ? card.sentence : card.word;
+    const langCode = document.getElementById('learn-lang').value;
+
+    // Google Online TTS URL (Works on PC & Mobile without installing voice packs)
+    const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&client=tw-ob`;
+
+    const audio = new Audio(googleTTSUrl);
+    
+    audio.play().catch(e => {
+        console.error("Audio Playback Error:", e);
+        // Fallback to browser TTS if offline or blocked
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = langCode;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    });
+}
+
+// --- Selection & Highlighting ---
 function handleSelection() {
     const sel = window.getSelection();
     const btn = document.getElementById('bold-tool');
@@ -63,28 +85,28 @@ function saveNote() {
     tempDiv.innerHTML = input.innerHTML;
     const words = tempDiv.querySelectorAll('.vocab-word');
     if (words.length === 0) return alert("Select a word to highlight first!");
-
+    
     const date = new Date().toLocaleDateString();
     words.forEach(w => {
         const target = w.innerText.trim();
         const sentence = tempDiv.innerText.trim();
         if (!notes[date]) notes[date] = [];
-        notes[date].push({
-            word: target,
-            sentence,
-            id: Date.now() + Math.random(),
-                         timestamp: Date.now()
+        notes[date].push({ 
+            word: target, 
+            sentence, 
+            id: Date.now() + Math.random(), 
+            timestamp: Date.now() 
         });
     });
     localStorage.setItem('vocab_notes', JSON.stringify(notes));
-    input.innerHTML = ""; alert("Card saved!");
+    input.innerHTML = ""; alert("Card saved successfully!");
 }
 
-// Session Flow logic
+// --- Session Flow ---
 function startRepeat(mode) {
     currentSessionCards = [];
     isReviewingMastered = (mode === 'mastered');
-
+    
     if (isReviewingMastered) {
         currentSessionCards = [...learnedWords];
     } else {
@@ -103,7 +125,7 @@ function startRepeat(mode) {
         });
     }
 
-    if (currentSessionCards.length === 0) return alert("No cards found!");
+    if (currentSessionCards.length === 0) return alert("No cards found for this period!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
@@ -111,7 +133,7 @@ function startRepeat(mode) {
     showSection('repeat');
 }
 
-// Card Display & Dictionary Integration
+// --- Rendering Logic ---
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
@@ -122,20 +144,20 @@ function showCard() {
         const sentence = card.sentence;
         const safeWord = card.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${safeWord})`, 'gi');
-
+        
         const masked = sentence.replace(regex, "___MARK___$1___END___");
         const parts = masked.split(/\s+/);
-
+        
         content.innerHTML = parts.map(p => {
             const cleanText = p.replace("___MARK___", "").replace("___END___", "");
             const dictionaryWord = cleanText.replace(/[.,!?।]/g, "");
-
+            
             if (p.includes("___MARK___")) {
                 return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 dark:text-white px-1 rounded font-bold italic cursor-pointer" onclick="lookup('${dictionaryWord}')">${cleanText}</mark>`;
             }
             return `<span class="cursor-pointer text-indigo-500 dark:text-indigo-400 hover:underline" onclick="lookup('${dictionaryWord}')">${p}</span>`;
         }).join(" ");
-
+        
         content.className = "text-2xl font-semibold text-slate-700 dark:text-slate-300 leading-snug";
     } else {
         content.innerText = card.word;
@@ -148,7 +170,7 @@ function nextCard() { if (currentIndex < currentSessionCards.length - 1) { curre
 function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
 
 function markAsLearned() {
-    if(!confirm("Move to Learned list?")) return;
+    if(!confirm("Move to Mastered list?")) return;
     learnedWords.push(currentSessionCards[currentIndex]);
     localStorage.setItem('learned_words', JSON.stringify(learnedWords));
     currentSessionCards.splice(currentIndex, 1);
@@ -157,7 +179,7 @@ function markAsLearned() {
 }
 
 function deleteCurrentCard() {
-    if (!confirm("Delete permanently?")) return;
+    if (!confirm("Delete this card permanently?")) return;
     const cardId = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== cardId);
     if (isReviewingMastered) learnedWords = learnedWords.filter(c => c.id !== cardId);
@@ -168,7 +190,7 @@ function deleteCurrentCard() {
     else { if(currentIndex >= currentSessionCards.length) currentIndex = 0; isFlipped = false; showCard(); }
 }
 
-// Global UI Section Control
+// --- UI Management ---
 function showSection(s) {
     document.querySelectorAll('#input-view, #repeat-view, #learned-view').forEach(e => e.classList.add('hidden'));
     if(s==='learned') renderLearnedList();
@@ -177,7 +199,7 @@ function showSection(s) {
 
 function renderLearnedList() {
     const list = document.getElementById('learned-list');
-    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">List is empty.</p>' : '';
+    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">Mastered list is empty.</p>' : '';
     [...learnedWords].reverse().forEach(lw => {
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-900 p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm";
@@ -186,41 +208,58 @@ function renderLearnedList() {
     });
 }
 
-// API Dictionary Lookup
+// --- Dictionary & Translator API ---
 async function lookup(word) {
     if (window.event) window.event.stopPropagation();
     const modal = document.getElementById('dict-modal');
-    document.getElementById('dict-word').innerText = "Searching...";
+    const card = currentSessionCards[currentIndex];
+    
+    document.getElementById('dict-word').innerText = "Translating...";
+    document.getElementById('dict-meaning').innerText = "...";
+    document.getElementById('sentence-meaning').innerText = "Fetching...";
+    
     modal.classList.replace('hidden', 'flex');
+
+    const sl = document.getElementById('learn-lang').value;
+    const tl = document.getElementById('target-lang').value;
+
     try {
-        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${document.getElementById('learn-lang').value}&tl=${document.getElementById('target-lang').value}&dt=t&q=${encodeURI(word)}`);
-        const data = await res.json();
+        const wordRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(word)}`);
+        const wordData = await wordRes.json();
+        
+        const sentRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(card.sentence)}`);
+        const sentData = await sentRes.json();
+
         document.getElementById('dict-word').innerText = word;
-        document.getElementById('dict-meaning').innerText = data[0][0][0];
-    } catch (e) { document.getElementById('dict-meaning').innerText = "Translation unavailable."; }
+        document.getElementById('dict-meaning').innerText = wordData[0][0][0];
+        document.getElementById('sentence-meaning').innerText = sentData[0][0][0];
+
+    } catch (e) { 
+        document.getElementById('dict-meaning').innerText = "Error";
+        document.getElementById('sentence-meaning').innerText = "Could not translate context.";
+    }
 }
 
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
 
-// Settings Modal Toggle (v2.0 Update)
 function toggleSettings() {
     const modal = document.getElementById('settings-modal');
     if(modal.classList.contains('hidden')) modal.classList.replace('hidden', 'flex');
     else modal.classList.replace('flex', 'hidden');
 }
 
-function exportData() {
-    const blob = new Blob([JSON.stringify({notes, learnedWords})], {type: "application/json"});
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `VocabLog_Backup.json`; a.click();
+function exportData() { 
+    const blob = new Blob([JSON.stringify({notes, learnedWords})], {type: "application/json"}); 
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); 
+    a.download = `VocabLog_Backup.json`; a.click(); 
 }
 
-function importData(e) {
-    const f = e.target.files[0]; if(!f)return;
-    const r = new FileReader(); r.onload = (ev) => {
-        const d = JSON.parse(ev.target.result);
-        localStorage.setItem('vocab_notes', JSON.stringify(d.notes));
-        localStorage.setItem('learned_words', JSON.stringify(d.learnedWords || []));
-        location.reload();
-    }; r.readAsText(f);
+function importData(e) { 
+    const f = e.target.files[0]; if(!f)return; 
+    const r = new FileReader(); r.onload = (ev) => { 
+        const d = JSON.parse(ev.target.result); 
+        localStorage.setItem('vocab_notes', JSON.stringify(d.notes)); 
+        localStorage.setItem('learned_words', JSON.stringify(d.learnedWords || [])); 
+        location.reload(); 
+    }; r.readAsText(f); 
 }
