@@ -72,6 +72,3 @@ The app also tracks user preferences for a personalized experience:
 
 ---
 
-এটি আপনার GitHub বা অন্য কোনো প্ল্যাটফর্মে প্রজেক্টের বর্ণনা হিসেবে ব্যবহার করতে পারেন। ওপেন সোর্স করার সময় একটি **LICENSE** ফাইল (যেমন: MIT License) যোগ করতে ভুলবেন না! 
-
-আপনার কি আর কোনো নির্দিষ্ট সেকশন (যেমন: Installation Guide) এর প্রয়োজন আছে?
