@@ -1,7 +1,7 @@
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
-let notes = JSON.parse(localStorage.getItem('vocab_notes')) || {};
-let learnedWords = JSON.parse(localStorage.getItem('learned_words')) || [];
+let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
+let learnedWords = JSON.parse(localStorage.getItem('sentvoc_learned')) || [];
 let currentSessionCards = [];
 let currentIndex = 0;
 let isFlipped = false;
@@ -34,7 +34,7 @@ window.onload = () => {
     tSel.onchange = () => localStorage.setItem('pref_target', tSel.value);
 };
 
-// Google Online TTS for Perfect Audio
+// Google Online TTS
 function speakText(event) {
     if (event) event.stopPropagation(); 
     const card = currentSessionCards[currentIndex];
@@ -78,8 +78,8 @@ function saveNote() {
         if (!notes[date]) notes[date] = [];
         notes[date].push({ word: w.innerText.trim(), sentence: temp.innerText.trim(), id: Date.now() + Math.random(), timestamp: Date.now() });
     });
-    localStorage.setItem('vocab_notes', JSON.stringify(notes));
-    input.innerHTML = ""; alert("Saved!");
+    localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
+    input.innerHTML = ""; alert("Card saved successfully!");
 }
 
 function startRepeat(mode) {
@@ -99,7 +99,7 @@ function startRepeat(mode) {
             });
         });
     }
-    if (currentSessionCards.length === 0) return alert("No cards!");
+    if (currentSessionCards.length === 0) return alert("No cards found!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
@@ -115,7 +115,7 @@ function showCard() {
         const regex = new RegExp(`(${card.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         content.innerHTML = card.sentence.replace(regex, "___MARK___$1___END___").split(/\s+/).map(p => {
             const clean = p.replace("___MARK___", "").replace("___END___", "").replace(/[.,!?।]/g, "");
-            if (p.includes("___MARK___")) return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 px-1 rounded font-bold cursor-pointer" onclick="lookup('${clean}')">${p.replace("___MARK___", "").replace("___END___", "")}</mark>`;
+            if (p.includes("___MARK___")) return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 px-1 rounded font-bold italic cursor-pointer" onclick="lookup('${clean}')">${p.replace("___MARK___", "").replace("___END___", "")}</mark>`;
             return `<span class="cursor-pointer text-indigo-500 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
         }).join(" ");
         content.className = "text-2xl font-semibold text-slate-700 dark:text-slate-300 leading-snug";
@@ -126,24 +126,24 @@ function showCard() {
 }
 
 function flipCard() { isFlipped = !isFlipped; showCard(); }
-function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("Done!"); showSection('input'); } }
+function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("End of session!"); showSection('input'); } }
 function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
 
 function markAsLearned() {
     if(!confirm("Mastered?")) return;
     learnedWords.push(currentSessionCards[currentIndex]);
-    localStorage.setItem('learned_words', JSON.stringify(learnedWords));
+    localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
     currentSessionCards.splice(currentIndex, 1);
     if (currentSessionCards.length === 0) showSection('input'); else { if(currentIndex >= currentSessionCards.length) currentIndex--; isFlipped = false; showCard(); }
 }
 
 function deleteCurrentCard() {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete permanently?")) return;
     const id = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== id);
     learnedWords = learnedWords.filter(c => c.id !== id);
-    localStorage.setItem('vocab_notes', JSON.stringify(notes));
-    localStorage.setItem('learned_words', JSON.stringify(learnedWords));
+    localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
+    localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
     currentSessionCards.splice(currentIndex, 1);
     if (currentSessionCards.length === 0) showSection('input'); else { if(currentIndex >= currentSessionCards.length) currentIndex = 0; isFlipped = false; showCard(); }
 }
@@ -192,15 +192,15 @@ function toggleSettings() {
 function exportData() { 
     const blob = new Blob([JSON.stringify({notes, learnedWords})], {type: "application/json"}); 
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); 
-    a.download = `VocabLog_Backup.json`; a.click(); 
+    a.download = `SentVoc_Backup.json`; a.click(); 
 }
 
 function importData(e) { 
     const f = e.target.files[0]; if(!f)return; 
     const r = new FileReader(); r.onload = (ev) => { 
         const d = JSON.parse(ev.target.result); 
-        localStorage.setItem('vocab_notes', JSON.stringify(d.notes)); 
-        localStorage.setItem('learned_words', JSON.stringify(d.learnedWords || [])); 
+        localStorage.setItem('sentvoc_notes', JSON.stringify(d.notes)); 
+        localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
         location.reload(); 
     }; r.readAsText(f); 
 }
