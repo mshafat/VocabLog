@@ -34,7 +34,7 @@ window.onload = () => {
     tSel.onchange = () => localStorage.setItem('pref_target', tSel.value);
 };
 
-// --- উন্নত অডিও ফাংশন (Linux ও iOS ফিক্স সহ) ---
+// --- অডিও ইঞ্জিন (উর্দু এবং লিনাক্স ফিক্স সহ) ---
 function speakText(event) {
     if (event) event.stopPropagation(); 
     
@@ -42,37 +42,34 @@ function speakText(event) {
     const textToSpeak = isFlipped ? card.sentence : card.word;
     const langCode = document.getElementById('learn-lang').value;
 
-    // ১. ব্রাউজারের নিজস্ব স্পিচ ইঞ্জিন চেক করা
+    // ১. সিস্টেমের ডিফল্ট ভয়েস ইঞ্জিন বন্ধ করা (লিনাক্স এরর এড়াতে)
     window.speechSynthesis.cancel();
-    const voices = window.speechSynthesis.getVoices();
-    const voiceFound = voices.length > 0 && voices.some(v => v.lang.startsWith(langCode));
 
-    // যদি লোকাল ভয়েস থাকে (যেমন আইফোন বা উইন্ডোজ)
-    if (voiceFound) {
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        utterance.lang = langCode;
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
-    } 
-    // ২. লোকাল ভয়েস না থাকলে গুগল টিটিএস ব্যবহার করা (লিনাক্সের জন্য জরুরি)
-    else {
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&client=tw-ob`;
-        const audio = new Audio();
-        audio.src = url;
-        audio.crossOrigin = "anonymous"; // লিনাক্স/ব্রেভ সিকিউরিটি ফিক্স
+    // ২. গুগল টিটিএস ইউআরএল (উর্দু ও লিনাক্সের জন্য অপ্টিমাইজড)
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&total=1&idx=0&textlen=${textToSpeak.length}&client=tw-ob`;
+    
+    const audio = new Audio();
+    audio.src = url;
+    audio.crossOrigin = "anonymous"; 
 
-        audio.play().catch(err => {
-            console.warn("External Audio blocked, trying one last fallback...");
-            // ৩. সব ফেইল করলে সিস্টেমের যা আছে তাই দিয়ে চেষ্টা করা
-            const lastChance = new SpeechSynthesisUtterance(textToSpeak);
-            lastChance.lang = langCode;
-            window.speechSynthesis.speak(lastChance);
+    // ৩. প্লেব্যাক লজিক
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+        playPromise.then(() => {
+            console.log("Audio playing via Google TTS");
+        }).catch(err => {
+            console.warn("Autoplay/Google blocked. Trying System Fallback...");
+            // ৪. গুগল ফেইল করলে সিস্টেমের যা আছে তাই দিয়ে চেষ্টা করা
+            const ut = new SpeechSynthesisUtterance(textToSpeak);
+            ut.lang = langCode;
+            ut.rate = 0.9;
+            window.speechSynthesis.speak(ut);
         });
     }
 }
 
-// ----------------------------------------------
-// বাকি সব ফাংশন আগের মতই থাকবে...
+// --- কার্ড ও সেকশন ম্যানেজমেন্ট ---
 function handleSelection() {
     const sel = window.getSelection();
     const btn = document.getElementById('bold-tool');
@@ -103,7 +100,7 @@ function saveNote() {
         notes[date].push({ word: w.innerText.trim(), sentence: temp.innerText.trim(), id: Date.now() + Math.random(), timestamp: Date.now() });
     });
     localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
-    input.innerHTML = ""; alert("Card saved successfully!");
+    input.innerHTML = ""; alert("Saved!");
 }
 
 function startRepeat(mode) {
@@ -123,7 +120,7 @@ function startRepeat(mode) {
             });
         });
     }
-    if (currentSessionCards.length === 0) return alert("No cards found!");
+    if (currentSessionCards.length === 0) return alert("No cards!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
@@ -142,7 +139,7 @@ function showCard() {
             if (p.includes("___MARK___")) return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 px-1 rounded font-bold italic cursor-pointer" onclick="lookup('${clean}')">${p.replace("___MARK___", "").replace("___END___", "")}</mark>`;
             return `<span class="cursor-pointer text-indigo-500 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
         }).join(" ");
-        content.className = "text-2xl font-semibold text-slate-700 dark:text-slate-300 leading-snug";
+        content.className = "text-2xl font-semibold text-slate-700 dark:text-slate-300";
     } else {
         content.innerText = card.word;
         content.className = "text-4xl font-black text-slate-800 dark:text-white uppercase";
@@ -150,7 +147,7 @@ function showCard() {
 }
 
 function flipCard() { isFlipped = !isFlipped; showCard(); }
-function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("End of session!"); showSection('input'); } }
+function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("Done!"); showSection('input'); } }
 function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
 
 function markAsLearned() {
@@ -162,7 +159,7 @@ function markAsLearned() {
 }
 
 function deleteCurrentCard() {
-    if (!confirm("Delete permanently?")) return;
+    if (!confirm("Delete?")) return;
     const id = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== id);
     learnedWords = learnedWords.filter(c => c.id !== id);
@@ -183,7 +180,7 @@ function renderLearnedList() {
     list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">Empty.</p>' : '';
     [...learnedWords].reverse().forEach(lw => {
         const div = document.createElement('div');
-        div.className = "bg-white dark:bg-slate-900 p-5 rounded-[1.5rem] border border-slate-100 shadow-sm";
+        div.className = "bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 shadow-sm mb-3";
         div.innerHTML = `<p class="font-bold text-indigo-600">${lw.word}</p><p class="text-sm text-slate-500">${lw.sentence}</p>`;
         list.appendChild(div);
     });
@@ -192,7 +189,7 @@ function renderLearnedList() {
 async function lookup(word) {
     if (window.event) window.event.stopPropagation();
     const modal = document.getElementById('dict-modal');
-    document.getElementById('dict-word').innerText = "Wait...";
+    document.getElementById('dict-word').innerText = "Translating...";
     modal.classList.replace('hidden', 'flex');
     const sl = document.getElementById('learn-lang').value;
     const tl = document.getElementById('target-lang').value;
@@ -227,8 +224,4 @@ function importData(e) {
         localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
         location.reload(); 
     }; r.readAsText(f); 
-}
-
-if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 }
