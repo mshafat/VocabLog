@@ -34,7 +34,7 @@ window.onload = () => {
     tSel.onchange = () => localStorage.setItem('pref_target', tSel.value);
 };
 
-// --- উন্নত অডিও লজিক (লিনাক্স ও উর্দু সমস্যার স্থায়ী সমাধান) ---
+// --- উন্নত অডিও ফাংশন (লিনাক্স ও আইফোন ফিক্স) ---
 function speakText(event) {
     if (event) event.stopPropagation(); 
     
@@ -42,32 +42,31 @@ function speakText(event) {
     const textToSpeak = isFlipped ? card.sentence : card.word;
     const langCode = document.getElementById('learn-lang').value;
 
-    // ১. সিস্টেমের স্পিচ ইঞ্জিনকে পুরোপুরি এড়িয়ে চলা (লিনাক্স এরর ফিক্স)
-    if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-    }
+    // ১. আগের সব সাউন্ড প্রসেস থামিয়ে দেওয়া
+    window.speechSynthesis.cancel();
 
-    // ২. গুগল টিটিএস এর সরাসরি অডিও ফাইল সোর্স
-    // লিনাক্সে উর্দু এবং ফারসি ভাষার জন্য এই client=tw-ob প্যারামিটারটি অত্যন্ত জরুরি
+    // ২. গুগল টিটিএস এর সরাসরি অডিও ফাইল (গুগল ট্রান্সলেশন মেথড)
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&total=1&idx=0&textlen=${textToSpeak.length}&client=tw-ob`;
     
     const audio = new Audio();
     audio.src = url;
+    // লিনাক্সে সিকিউরিটি এরর এড়াতে ক্রস অরিজিন এননিম্যাস করা হয়েছে
     audio.crossOrigin = "anonymous"; 
 
-    // ৩. অডিও প্লে করার কমান্ড
+    // ৩. প্লে করার কমান্ড
     audio.play().then(() => {
-        console.log("Success: Audio playing via Google Cloud TTS");
+        console.log("সাউন্ড বাজছে...");
     }).catch(err => {
-        console.error("Audio Playback Error:", err);
-        // যদি গুগল কোনো কারণে ব্লক করে (যেমন নেটওয়ার্ক সমস্যা), তবেই কেবল সিস্টেম ট্রাই করবে
+        console.warn("গুগল টিটিএস ব্লক হয়েছে, সিস্টেম ভয়েস ট্রাই করছি...");
+        // ৪. গুগল ব্লক করলে সিস্টেমের নিজস্ব ভয়েস দিয়ে চেষ্টা
         const ut = new SpeechSynthesisUtterance(textToSpeak);
         ut.lang = langCode;
+        ut.rate = 0.9;
         window.speechSynthesis.speak(ut);
     });
 }
 
-// --- কার্ড ম্যানেজমেন্ট ফাংশনসমূহ ---
+// --- বাকি সব ফাংশন ---
 function handleSelection() {
     const sel = window.getSelection();
     const btn = document.getElementById('bold-tool');
@@ -91,14 +90,14 @@ function saveNote() {
     const temp = document.createElement('div');
     temp.innerHTML = input.innerHTML;
     const words = temp.querySelectorAll('.vocab-word');
-    if (words.length === 0) return alert("Highlight a word first!");
+    if (words.length === 0) return alert("প্রথমে শব্দটি হাইলাইট করুন!");
     const date = new Date().toLocaleDateString();
     words.forEach(w => {
         if (!notes[date]) notes[date] = [];
         notes[date].push({ word: w.innerText.trim(), sentence: temp.innerText.trim(), id: Date.now() + Math.random(), timestamp: Date.now() });
     });
     localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
-    input.innerHTML = ""; alert("Saved Successfully!");
+    input.innerHTML = ""; alert("সেভ করা হয়েছে!");
 }
 
 function startRepeat(mode) {
@@ -118,7 +117,7 @@ function startRepeat(mode) {
             });
         });
     }
-    if (currentSessionCards.length === 0) return alert("No cards to review!");
+    if (currentSessionCards.length === 0) return alert("কোন কার্ড পাওয়া যায়নি!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
@@ -145,11 +144,11 @@ function showCard() {
 }
 
 function flipCard() { isFlipped = !isFlipped; showCard(); }
-function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("End of Session!"); showSection('input'); } }
+function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("সেশন শেষ!"); showSection('input'); } }
 function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
 
 function markAsLearned() {
-    if(!confirm("Move to Learned?")) return;
+    if(!confirm("আয়ত্ত করা হয়েছে?")) return;
     learnedWords.push(currentSessionCards[currentIndex]);
     localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
     currentSessionCards.splice(currentIndex, 1);
@@ -157,7 +156,7 @@ function markAsLearned() {
 }
 
 function deleteCurrentCard() {
-    if (!confirm("Delete permanently?")) return;
+    if (!confirm("মুছে ফেলবেন?")) return;
     const id = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== id);
     learnedWords = learnedWords.filter(c => c.id !== id);
@@ -175,7 +174,7 @@ function showSection(s) {
 
 function renderLearnedList() {
     const list = document.getElementById('learned-list');
-    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">No mastered words yet.</p>' : '';
+    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">এখনও কিছু শেখা হয়নি।</p>' : '';
     [...learnedWords].reverse().forEach(lw => {
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 shadow-sm mb-3";
@@ -187,7 +186,7 @@ function renderLearnedList() {
 async function lookup(word) {
     if (window.event) window.event.stopPropagation();
     const modal = document.getElementById('dict-modal');
-    document.getElementById('dict-word').innerText = "Searching...";
+    document.getElementById('dict-word').innerText = "অনুবাদ হচ্ছে...";
     modal.classList.replace('hidden', 'flex');
     const sl = document.getElementById('learn-lang').value;
     const tl = document.getElementById('target-lang').value;
@@ -199,10 +198,11 @@ async function lookup(word) {
         document.getElementById('dict-word').innerText = word;
         document.getElementById('dict-meaning').innerText = wData[0][0][0];
         document.getElementById('sentence-meaning').innerText = sData[0][0][0];
-    } catch (e) { document.getElementById('dict-meaning').innerText = "Translation Error"; }
+    } catch (e) { document.getElementById('dict-meaning').innerText = "ত্রুটি"; }
 }
 
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
+
 function toggleSettings() {
     const m = document.getElementById('settings-modal');
     m.classList.contains('hidden') ? m.classList.replace('hidden', 'flex') : m.classList.replace('flex', 'hidden');
