@@ -1,3 +1,4 @@
+// ভার্সন কোড নেম: SentVoc v2.5 - iPhone Native Speech Fix
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -6,9 +7,6 @@ let currentSessionCards = [];
 let currentIndex = 0;
 let isFlipped = false;
 let isReviewingMastered = false;
-
-// আইফোন অডিও আনলক ট্র্যাকার
-let iosAudioUnlocked = false;
 
 function applyTheme() {
     const saved = localStorage.getItem('theme');
@@ -34,24 +32,13 @@ window.onload = () => {
     lSel.value = localStorage.getItem('pref_learn') || "ur";
     tSel.value = localStorage.getItem('pref_target') || "bn";
     
-    // আইফোনের সাইলেন্ট অডিও গেটওয়ে আনলক করা
-    const unlockEvents = ['touchstart', 'click', 'keydown'];
-    unlockEvents.forEach(event => {
-        document.body.addEventListener(event, unlockIOSAudio, { once: true });
-    });
+    // আইফোনের জন্য অডিও ইঞ্জিন আগেভাগে রেডি করা
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+    }
 };
 
-function unlockIOSAudio() {
-    if (iosAudioUnlocked) return;
-    // একটি খালি সাউন্ড প্লে করে ব্রাউজারের অডিও চ্যানেলটি ওপেন করা
-    window.speechSynthesis.cancel();
-    const silent = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(silent);
-    iosAudioUnlocked = true;
-    console.log("v2.4: Audio Engine Unlocked for iOS");
-}
-
-// --- অডিও ইঞ্জিন (v2.4: Hybrid Cloud + System TTS) ---
+// --- আইফোন স্পেশাল অডিও ইঞ্জিন (v2.5) ---
 function speakText(event) {
     if (event) {
         event.stopPropagation();
@@ -62,31 +49,33 @@ function speakText(event) {
     const textToSpeak = isFlipped ? card.sentence : card.word;
     const langCode = document.getElementById('learn-lang').value;
 
+    // ১. আগের সব সাউন্ড বন্ধ করা
     window.speechSynthesis.cancel();
 
-    // সরাসরি গুগল টিটিএস সোর্স
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&total=1&idx=0&textlen=${textToSpeak.length}&client=tw-ob`;
+    // ২. স্পিচ অবজেক্ট তৈরি
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
     
-    const audio = new Audio();
-    audio.src = url;
-    audio.crossOrigin = "anonymous";
+    // ৩. ভাষা সেট করা
+    utterance.lang = langCode;
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
 
-    // আইফোন এবং লিনাক্স ব্রেভ/ফায়ারফক্সের জন্য সেফটি প্লেব্যাক
-    const playPromise = audio.play();
+    // ৪. আইফোনের জন্য বিশেষ হ্যাক: ভলিউম এবং ভয়েস সিলেকশন
+    utterance.volume = 1.0;
 
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            console.warn("Cloud TTS failed, falling back to System TTS:", error);
-            // ব্যাকআপ হিসেবে সিস্টেমের নিজস্ব টিটিএস ব্যবহার
-            const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            utterance.lang = langCode;
-            utterance.rate = 0.85; // লিনাক্স ও আইফোনের জন্য একটু ধীর গতি ভালো কাজ করে
-            window.speechSynthesis.speak(utterance);
-        });
-    }
+    // ৫. আইফোনে অনেক সময় সরাসরি .speak কাজ করে না, যদি না একটি ছোট বিরতি দেওয়া হয়
+    setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+    }, 50);
+
+    // ৬. ব্যাকআপ (যদি আইফোন সিস্টেম ভয়েস সাপোর্ট না করে, তখন গুগল টিটিএস ট্রাই করবে)
+    utterance.onerror = () => {
+        const audio = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&client=tw-ob`);
+        audio.play().catch(e => console.log("iPhone Blocked Audio Playback"));
+    };
 }
 
-// --- কোর ফিচারসমূহ (v2.2 থেকে অক্ষুণ্ণ) ---
+// --- বাকি সব ফাংশন v2.4 এর মতই থাকছে ---
 function handleSelection() {
     const sel = window.getSelection();
     const btn = document.getElementById('bold-tool');
@@ -110,14 +99,14 @@ function saveNote() {
     const temp = document.createElement('div');
     temp.innerHTML = input.innerHTML;
     const words = temp.querySelectorAll('.vocab-word');
-    if (words.length === 0) return alert("প্রথমে শব্দটি হাইলাইট করুন!");
+    if (words.length === 0) return alert("Select word first!");
     const date = new Date().toLocaleDateString();
     words.forEach(w => {
         if (!notes[date]) notes[date] = [];
         notes[date].push({ word: w.innerText.trim(), sentence: temp.innerText.trim(), id: Date.now() + Math.random(), timestamp: Date.now() });
     });
     localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
-    input.innerHTML = ""; alert("সেভ সফল হয়েছে!");
+    input.innerHTML = ""; alert("Saved!");
 }
 
 function startRepeat(mode) {
@@ -137,7 +126,7 @@ function startRepeat(mode) {
             });
         });
     }
-    if (currentSessionCards.length === 0) return alert("কোন কার্ড নেই!");
+    if (currentSessionCards.length === 0) return alert("No cards!");
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
     document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
@@ -164,11 +153,11 @@ function showCard() {
 }
 
 function flipCard() { isFlipped = !isFlipped; showCard(); }
-function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("সেশন শেষ!"); showSection('input'); } }
+function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("Done!"); showSection('input'); } }
 function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
 
 function markAsLearned() {
-    if(!confirm("আয়ত্ত করেছেন?")) return;
+    if(!confirm("Mastered?")) return;
     learnedWords.push(currentSessionCards[currentIndex]);
     localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
     currentSessionCards.splice(currentIndex, 1);
@@ -176,7 +165,7 @@ function markAsLearned() {
 }
 
 function deleteCurrentCard() {
-    if (!confirm("মুছে ফেলবেন?")) return;
+    if (!confirm("Delete?")) return;
     const id = currentSessionCards[currentIndex].id;
     for (let d in notes) notes[d] = notes[d].filter(c => c.id !== id);
     learnedWords = learnedWords.filter(c => c.id !== id);
@@ -194,7 +183,7 @@ function showSection(s) {
 
 function renderLearnedList() {
     const list = document.getElementById('learned-list');
-    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">Mastered list empty.</p>' : '';
+    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400">Empty.</p>' : '';
     [...learnedWords].reverse().forEach(lw => {
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 shadow-sm mb-3";
@@ -206,7 +195,7 @@ function renderLearnedList() {
 async function lookup(word) {
     if (window.event) window.event.stopPropagation();
     const modal = document.getElementById('dict-modal');
-    document.getElementById('dict-word').innerText = "অনুসন্ধান চলছে...";
+    document.getElementById('dict-word').innerText = "Translating...";
     modal.classList.replace('hidden', 'flex');
     const sl = document.getElementById('learn-lang').value;
     const tl = document.getElementById('target-lang').value;
@@ -218,7 +207,7 @@ async function lookup(word) {
         document.getElementById('dict-word').innerText = word;
         document.getElementById('dict-meaning').innerText = wData[0][0][0];
         document.getElementById('sentence-meaning').innerText = sData[0][0][0];
-    } catch (e) { document.getElementById('dict-meaning').innerText = "অনুবাদে সমস্যা হয়েছে।"; }
+    } catch (e) { document.getElementById('dict-meaning').innerText = "Error"; }
 }
 
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
@@ -231,7 +220,7 @@ function toggleSettings() {
 function exportData() { 
     const blob = new Blob([JSON.stringify({notes, learnedWords})], {type: "application/json"}); 
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); 
-    a.download = `SentVoc_v2.4_Backup.json`; a.click(); 
+    a.download = `SentVoc_v2.5_Backup.json`; a.click(); 
 }
 
 function importData(e) { 
