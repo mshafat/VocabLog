@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v3.3 - Expanded Vertical Bounds & Layout Stability
+// ভার্সন কোড নেম: SentVoc v3.4 - Web Share API & ISO Export
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -9,6 +9,53 @@ let isFlipped = false;
 
 window.onload = () => {
     applyTheme();
+    setupLanguages();
+    
+    // অন্য অ্যাপ থেকে শেয়ার হয়ে আসা টেক্সট হ্যান্ডেল করা (Incoming Share)
+    const parsedUrl = new URL(window.location.href);
+    const sharedText = parsedUrl.searchParams.get('text') || parsedUrl.searchParams.get('title');
+    if (sharedText) {
+        document.getElementById('note-input').innerText = sharedText;
+    }
+
+    const inputArea = document.getElementById('note-input');
+    if(inputArea) inputArea.addEventListener('dblclick', handleSmartHighlight);
+};
+
+// --- স্মার্ট এক্সপোর্ট (Web Share API) ---
+async function exportData() {
+    const dataStr = JSON.stringify({ notes, learnedWords }, null, 2);
+    const isoDate = new Date().toISOString().split('T')[0]; // ফরম্যাট: YYYY-MM-DD
+    const fileName = `SentVoc_${isoDate}.json`;
+
+    // যদি মোবাইল ব্রাউজার হয় এবং শেয়ার অপশন থাকে
+    if (navigator.share && navigator.canShare) {
+        const file = new File([dataStr], fileName, { type: "application/json" });
+        try {
+            await navigator.share({
+                title: 'SentVoc Backup',
+                files: [file]
+            });
+        } catch (err) {
+            console.log("Share failed, falling back to download.");
+            fallbackDownload(dataStr, fileName);
+        }
+    } else {
+        // পিসির জন্য সাধারণ ডাউনলোড
+        fallbackDownload(dataStr, fileName);
+    }
+}
+
+function fallbackDownload(content, fileName) {
+    const blob = new Blob([content], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+}
+
+// --- ইনপুট ও সেটিংস লজিক ---
+function setupLanguages() {
     const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
     Object.entries(languages).forEach(([c, n]) => { 
         lSel.add(new Option(n, c)); 
@@ -16,45 +63,23 @@ window.onload = () => {
     });
     lSel.value = localStorage.getItem('pref_learn') || "ur";
     tSel.value = localStorage.getItem('pref_target') || "bn";
-    
-    const inputArea = document.getElementById('note-input');
-    if(inputArea) inputArea.addEventListener('dblclick', handleSmartHighlight);
-};
-
-// --- ফন্ট স্কেলিং লজিক (v3.3: ভার্টিক্যাল স্পেস অপ্টিমাইজড) ---
-function getDynamicFontSize(text, type) {
-    const wordCount = text.split(/\s+/).length;
-    const charCount = text.length;
-    
-    if (type === 'word') {
-        const isLatin = /^[A-Za-z0-9\s!@#$%^&*(),.?":{}|<>]+$/.test(text);
-        let size = isLatin ? 2.3 : 3.2; 
-        if (charCount > 12) size *= 0.75;
-        return size + "rem";
-    } else {
-        // বাক্যের জন্য উন্নত স্কেলিং
-        let size = 1.55; 
-        let lineHeight = 1.45;
-        if (wordCount > 55) { size = 1.05; lineHeight = 1.25; }
-        else if (wordCount > 35) { size = 1.25; lineHeight = 1.35; }
-        else if (wordCount > 20) { size = 1.45; lineHeight = 1.4; }
-        return { size: size + "rem", lh: lineHeight };
-    }
 }
 
+function toggleSettings() {
+    const m = document.getElementById('settings-modal');
+    if(m) m.classList.toggle('hidden');
+}
+
+// --- লেআউট ও কার্ড ডিসপ্লে (v3.3 এর সেই ম্যাক্সিমাম স্পেস বজায় রাখা হয়েছে) ---
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
-    
     document.getElementById('card-progress').innerText = `${currentIndex + 1} / ${currentSessionCards.length}`;
     document.getElementById('prev-btn').disabled = currentIndex === 0;
     
-    // v3.3: কন্টেইনার মার্জিন ও প্যাডিং মিনিমাইজ করা হয়েছে ২ লাইন জায়গা বাড়াতে
     content.style.display = "block"; 
     content.style.width = "100%";
-    content.style.padding = "2px 5px"; // ওপর-নিচে প্যাডিং কমিয়ে আনা হয়েছে
-    content.style.marginTop = "0px";   // অতিরিক্ত মার্জিন রিমুভ
-    content.style.marginBottom = "0px";
+    content.style.padding = "2px 5px";
     content.style.wordBreak = "normal"; 
     content.style.overflowWrap = "break-word";
 
@@ -69,17 +94,32 @@ function showCard() {
             if (p.includes("___MARK___")) return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 px-1 rounded font-bold italic cursor-pointer" onclick="lookup('${clean}')">${p.replace("___MARK___", "").replace("___END___", "")}</mark>`;
             return `<span class="cursor-pointer text-indigo-500 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
         }).join(" ");
-        
         content.className = "font-semibold text-slate-700 dark:text-slate-300 text-center";
     } else {
         content.innerText = card.word;
         content.style.fontSize = getDynamicFontSize(card.word, 'word');
-        content.style.lineHeight = "1.2";
-        content.className = "font-black text-slate-800 dark:text-white uppercase text-center tracking-tight pt-4"; // ফ্রন্ট সাইডে সামান্য প্যাডিং যাতে ওপরে না লেগে যায়
+        content.className = "font-black text-slate-800 dark:text-white uppercase text-center tracking-tight pt-4";
     }
 }
 
-// --- স্মার্ট হাইলাইট ---
+// --- ফন্ট স্কেলিং ---
+function getDynamicFontSize(text, type) {
+    const wordCount = text.split(/\s+/).length;
+    if (type === 'word') {
+        const isLatin = /^[A-Za-z0-9\s!@#$%^&*(),.?":{}|<>]+$/.test(text);
+        let size = isLatin ? 2.3 : 3.2; 
+        if (text.length > 12) size *= 0.75;
+        return size + "rem";
+    } else {
+        let size = 1.55; 
+        let lineHeight = 1.45;
+        if (wordCount > 55) { size = 1.05; lineHeight = 1.25; }
+        else if (wordCount > 35) { size = 1.25; lineHeight = 1.35; }
+        return { size: size + "rem", lh: lineHeight };
+    }
+}
+
+// --- বাকি সব কোর ফিচার ---
 function handleSmartHighlight(e) {
     const selection = window.getSelection();
     if (!selection.rangeCount || selection.toString().trim() === "") return;
@@ -101,40 +141,6 @@ function handleSmartHighlight(e) {
     window.getSelection().removeAllRanges();
 }
 
-// --- থিম ও সেটিংস ---
-function applyTheme() {
-    const saved = localStorage.getItem('theme');
-    const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.classList.toggle('dark', isDark);
-    const icon = document.getElementById('theme-icon');
-    if(icon) icon.innerText = isDark ? '☀️' : '🌙';
-}
-
-function toggleTheme() {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    applyTheme();
-}
-
-function toggleSettings() {
-    const m = document.getElementById('settings-modal');
-    if(m) m.classList.toggle('hidden');
-}
-
-// --- অডিও ইঞ্জিন ---
-function speakText(event) {
-    if (event) event.stopPropagation();
-    const card = currentSessionCards[currentIndex];
-    const textToSpeak = isFlipped ? card.sentence : card.word;
-    const langCode = document.getElementById('learn-lang').value;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.lang = langCode;
-    utterance.rate = 0.9;
-    setTimeout(() => { window.speechSynthesis.speak(utterance); }, 50);
-}
-
-// --- কোর ফাংশন ---
 function saveNote() {
     const input = document.getElementById('note-input');
     const words = input.querySelectorAll('.vocab-word');
@@ -188,4 +194,40 @@ async function lookup(word) {
     } catch (e) { console.error(e); }
 }
 
+function applyTheme() {
+    const saved = localStorage.getItem('theme');
+    const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
+    const icon = document.getElementById('theme-icon');
+    if(icon) icon.innerText = isDark ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    applyTheme();
+}
+
+function importData(e) { 
+    const f = e.target.files[0]; if(!f)return; 
+    const r = new FileReader(); r.onload = (ev) => { 
+        const d = JSON.parse(ev.target.result); 
+        localStorage.setItem('sentvoc_notes', JSON.stringify(d.notes)); 
+        localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
+        location.reload(); 
+    }; r.readAsText(f); 
+}
+
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
+
+function speakText(event) {
+    if (event) event.stopPropagation();
+    const card = currentSessionCards[currentIndex];
+    const textToSpeak = isFlipped ? card.sentence : card.word;
+    const langCode = document.getElementById('learn-lang').value;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = langCode;
+    utterance.rate = 0.9;
+    setTimeout(() => { window.speechSynthesis.speak(utterance); }, 50);
+}
