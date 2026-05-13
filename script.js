@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v3.9 - Mastered Fix & Clean Share Logic
+// ভার্সন কোড নেম: SentVoc v4.0 - Import Fix & Double Text Cleaner
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -7,6 +7,7 @@ let currentSessionCards = [];
 let currentIndex = 0;
 let isFlipped = false;
 
+// সার্ভিস ওয়ার্কার রেজিস্ট্রেশন
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
@@ -22,32 +23,69 @@ window.onload = () => {
     if(inputArea) inputArea.addEventListener('dblclick', handleSmartHighlight);
 };
 
-// --- URL বাদে শুধু টেক্সট রিসিভ করার লজিক ---
+// --- ডাবল টেক্সট, কোটেশন এবং URL ক্লিনার ---
 function handleIncomingShare() {
     const urlParams = new URLSearchParams(window.location.search);
-    let sharedText = urlParams.get('text') || urlParams.get('title');
+    const sharedText = urlParams.get('text');
+    const sharedTitle = urlParams.get('title');
     
-    if (sharedText) {
-        // রেগুলার এক্সপ্রেশন ব্যবহার করে টেক্সট থেকে ইউআরএল অংশটি বাদ দেওয়া হয়েছে
-        const cleanText = decodeURIComponent(sharedText).replace(/(?:https?|ftp):\/\/[\n\S]+/g, '').replace(/\+/g, ' ').trim();
+    if (sharedText || sharedTitle) {
+        // যদি টাইটেল এবং টেক্সট একই হয় তবে একটা নিবে, নাহলে যোগ করবে
+        let fullContent = (sharedTitle && sharedText && sharedTitle !== sharedText) 
+            ? `${sharedTitle} ${sharedText}` 
+            : (sharedText || sharedTitle);
+
+        // ১. URL মোছা, ২. দুই পাশের কোটেশন (") মোছা, ৩. বাড়তি স্পেস মোছা
+        let cleanText = decodeURIComponent(fullContent)
+            .replace(/(?:https?|ftp):\/\/[\n\S]+/g, '') 
+            .replace(/^["']|["']$/g, '') 
+            .replace(/\+/g, ' ')
+            .trim();
         
         setTimeout(() => {
             const inputArea = document.getElementById('note-input');
             if (inputArea) {
                 inputArea.innerText = cleanText;
+                // URL ক্লিন করা যাতে রিফ্রেশে বারবার না আসে
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         }, 500);
     }
 }
 
-// --- আপনার বন্ধুর এক্সপোর্ট কোড (এবার গ্যারান্টিড কাজ করবে) ---
+// --- ডাটা ইমপোর্ট ফাংশন (Fix: এটি কাজ করছিল না) ---
+function importData(e) { 
+    const file = e.target.files[0]; 
+    if(!file) return; 
+    
+    const reader = new FileReader(); 
+    reader.onload = (event) => { 
+        try {
+            const data = JSON.parse(event.target.result); 
+            // ডাটা ভ্যালিডেশন
+            if(data.notes) {
+                notes = data.notes;
+                localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
+            }
+            if(data.learnedWords) {
+                learnedWords = data.learnedWords;
+                localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
+            }
+            alert("Data Imported Successfully!");
+            location.reload(); 
+        } catch (err) {
+            alert("Invalid JSON file!");
+        }
+    }; 
+    reader.readAsText(file); 
+}
+
+// --- এক্সপোর্ট ফাংশন (শেয়ার অপশন সহ) ---
 async function exportData() {
     const data = JSON.stringify({notes, learnedWords}, null, 2);
     const fileName = `SentVoc_Backup_${new Date().toISOString().slice(0,10)}.json`;
 
     try {
-        // ফাইলে শেয়ার করার জন্য এটি একটি ব্লব থেকে ফাইল অবজেক্ট তৈরি করে
         const blob = new Blob([data], { type: 'application/json' });
         const file = new File([blob], fileName, { type: 'application/json' });
 
@@ -70,38 +108,26 @@ function downloadFile(content, name) {
     a.href = URL.createObjectURL(blob);
     a.download = name;
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 
-// --- মাস্টারড (Mastered) ফাংশন (যা কাজ করছিল না) ---
+// --- মাস্টারড (Learned) লজিক ---
 function markAsLearned() {
     const card = currentSessionCards[currentIndex];
     if (!learnedWords.some(w => w.id === card.id)) {
         learnedWords.push(card);
         localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
-        alert("Moved to Learned List!");
-        nextCard(); // পরের কার্ডে চলে যাবে
+        alert("Mastered!");
+        nextCard();
     }
 }
 
-// --- লার্নড লিস্ট দেখানোর ফাংশন ---
-function showLearned() {
-    const container = document.getElementById('learned-list');
-    container.innerHTML = learnedWords.length === 0 ? '<p class="text-center opacity-50">Empty list</p>' : '';
-    
-    learnedWords.forEach(wordObj => {
-        const div = document.createElement('div');
-        div.className = "p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm mb-2 border-l-4 border-green-500";
-        div.innerHTML = `<strong>${wordObj.word}</strong>: <span class="text-sm opacity-75">${wordObj.sentence}</span>`;
-        container.appendChild(div);
-    });
-    showSection('learned');
-}
-
-// --- কার্ড ডিসপ্লে ও স্পেসিং (v3.3) ---
+// --- কার্ড ডিসপ্লে (v3.3 ম্যাক্সিমাম স্পেস) ---
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
-    
+    if(!content) return;
+
     document.getElementById('card-progress').innerText = `${currentIndex + 1} / ${currentSessionCards.length}`;
     document.getElementById('prev-btn').disabled = currentIndex === 0;
     
@@ -128,6 +154,7 @@ function showCard() {
     }
 }
 
+// --- ফন্ট সাইজ কন্ট্রোল ---
 function getDynamicFontSize(text, type) {
     const wordCount = text.split(/\s+/).length;
     if (type === 'word') {
@@ -144,18 +171,7 @@ function getDynamicFontSize(text, type) {
     }
 }
 
-// --- অন্যান্য ফাংশন ---
-function setupLanguages() {
-    const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
-    if(!lSel) return;
-    Object.entries(languages).forEach(([c, n]) => { 
-        lSel.add(new Option(n, c)); 
-        tSel.add(new Option(n, c)); 
-    });
-    lSel.value = localStorage.getItem('pref_learn') || "ur";
-    tSel.value = localStorage.getItem('pref_target') || "bn";
-}
-
+// --- অন্যান্য সেটিংস ---
 function saveNote() {
     const input = document.getElementById('note-input');
     const words = input.querySelectorAll('.vocab-word');
@@ -196,6 +212,17 @@ function showSection(s) {
     document.getElementById(s+'-view').classList.remove('hidden');
 }
 
+function setupLanguages() {
+    const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
+    if(!lSel) return;
+    Object.entries(languages).forEach(([c, n]) => { 
+        lSel.add(new Option(n, c)); 
+        tSel.add(new Option(n, c)); 
+    });
+    lSel.value = localStorage.getItem('pref_learn') || "ur";
+    tSel.value = localStorage.getItem('pref_target') || "bn";
+}
+
 function applyTheme() {
     const saved = localStorage.getItem('theme');
     const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -205,6 +232,12 @@ function applyTheme() {
 function toggleSettings() {
     const m = document.getElementById('settings-modal');
     if(m) m.classList.toggle('hidden');
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    applyTheme();
 }
 
 function handleSmartHighlight(e) {
@@ -242,3 +275,15 @@ async function lookup(word) {
 }
 
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
+
+function speakText(event) {
+    if (event) event.stopPropagation();
+    const card = currentSessionCards[currentIndex];
+    const textToSpeak = isFlipped ? card.sentence : card.word;
+    const langCode = document.getElementById('learn-lang').value;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = langCode;
+    utterance.rate = 0.9;
+    setTimeout(() => { window.speechSynthesis.speak(utterance); }, 50);
+}
