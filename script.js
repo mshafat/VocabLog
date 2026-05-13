@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v3.5 - Smart Export & PWA Share Target Ready
+// ভার্সন কোড নেম: SentVoc v3.6 - Function Sync & Share Target Fix
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -11,28 +11,32 @@ window.onload = () => {
     applyTheme();
     setupLanguages();
     
-    // অন্য অ্যাপ থেকে শেয়ার হয়ে আসা টেক্সট হ্যান্ডেল করা (Incoming Share Logic)
-    // যখন ইউজার শেয়ার মেনু থেকে এই অ্যাপটি সিলেক্ট করবে
-    const parsedUrl = new URL(window.location.href);
-    const sharedText = parsedUrl.searchParams.get('text') || parsedUrl.searchParams.get('title') || parsedUrl.searchParams.get('description');
+    // অন্য অ্যাপ থেকে শেয়ার হয়ে আসা টেক্সট হ্যান্ডেল করা (v3.6 Fix)
+    const params = new URLSearchParams(window.location.search);
+    const sharedText = params.get('text') || params.get('title') || params.get('url');
+    
     if (sharedText) {
-        const inputArea = document.getElementById('note-input');
-        if(inputArea) {
-            inputArea.innerText = sharedText;
-            alert("Text received from share!");
-        }
+        // ছোট একটি ডিলে দেওয়া হয়েছে যাতে UI পুরোপুরি লোড হওয়ার পর ইনপুট পায়
+        setTimeout(() => {
+            const inputArea = document.getElementById('note-input');
+            if(inputArea) {
+                inputArea.innerText = decodeURIComponent(sharedText);
+                // ইনপুট পাওয়ার পর URL ক্লিন করে ফেলা যাতে রিলোড দিলে আবার না আসে
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }, 500);
     }
 
     const inputArea = document.getElementById('note-input');
     if(inputArea) inputArea.addEventListener('dblclick', handleSmartHighlight);
 };
 
-// --- আপনার বন্ধুর দেওয়া স্মার্ট এক্সপোর্ট কোড ---
-async function smartExport() {
+// --- আপনার বন্ধুর দেওয়া এক্সপোর্ট কোড (ফাংশন নাম exportData রাখা হয়েছে যাতে HTML পরিবর্তন করতে না হয়) ---
+async function exportData() {
     const data = JSON.stringify({notes, learnedWords}, null, 2);
     const fileName = `SentVoc_Backup_${new Date().toISOString().slice(0,10)}.json`;
 
-    // ডিভাইসটি ফাইল শেয়ারিং সাপোর্ট করে কিনা চেক করা
+    // Web Share API সাপোর্ট চেক
     if (navigator.canShare && navigator.share) {
         const file = new File([data], fileName, { type: 'application/json' });
         
@@ -42,13 +46,11 @@ async function smartExport() {
                 text: 'My vocabulary backup file',
                 files: [file]
             });
-            console.log('Shared successfully');
         } catch (err) {
             console.error('Sharing failed, falling back to download:', err);
             downloadFile(data, fileName);
         }
     } else {
-        // পিসি বা সাধারণ ব্রাউজারের জন্য ডাউনলোড
         downloadFile(data, fileName);
     }
 }
@@ -62,7 +64,7 @@ function downloadFile(content, name) {
     URL.revokeObjectURL(a.href);
 }
 
-// --- সেটিংস ও ল্যাঙ্গুয়েজ সেটআপ ---
+// --- বাকি ফাংশনগুলো v3.5 এর মতোই থাকছে ---
 function setupLanguages() {
     const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
     if(!lSel) return;
@@ -74,12 +76,6 @@ function setupLanguages() {
     tSel.value = localStorage.getItem('pref_target') || "bn";
 }
 
-function toggleSettings() {
-    const m = document.getElementById('settings-modal');
-    if(m) m.classList.toggle('hidden');
-}
-
-// --- কার্ড ডিসপ্লে ও ডাইনামিক লেআউট (v3.3 থেকে সংরক্ষিত) ---
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
@@ -127,7 +123,6 @@ function getDynamicFontSize(text, type) {
     }
 }
 
-// --- বাকি সব ফিচার ---
 function handleSmartHighlight(e) {
     const selection = window.getSelection();
     if (!selection.rangeCount || selection.toString().trim() === "") return;
@@ -193,14 +188,16 @@ function applyTheme() {
     const saved = localStorage.getItem('theme');
     const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', isDark);
-    const icon = document.getElementById('theme-icon');
-    if(icon) icon.innerText = isDark ? '☀️' : '🌙';
 }
 
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    applyTheme();
+}
+
+function toggleSettings() {
+    const m = document.getElementById('settings-modal');
+    if(m) m.classList.toggle('hidden');
 }
 
 function importData(e) { 
