@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v3.4 - Web Share API & ISO Export
+// ভার্সন কোড নেম: SentVoc v3.5 - Smart Export & PWA Share Target Ready
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -11,52 +11,61 @@ window.onload = () => {
     applyTheme();
     setupLanguages();
     
-    // অন্য অ্যাপ থেকে শেয়ার হয়ে আসা টেক্সট হ্যান্ডেল করা (Incoming Share)
+    // অন্য অ্যাপ থেকে শেয়ার হয়ে আসা টেক্সট হ্যান্ডেল করা (Incoming Share Logic)
+    // যখন ইউজার শেয়ার মেনু থেকে এই অ্যাপটি সিলেক্ট করবে
     const parsedUrl = new URL(window.location.href);
-    const sharedText = parsedUrl.searchParams.get('text') || parsedUrl.searchParams.get('title');
+    const sharedText = parsedUrl.searchParams.get('text') || parsedUrl.searchParams.get('title') || parsedUrl.searchParams.get('description');
     if (sharedText) {
-        document.getElementById('note-input').innerText = sharedText;
+        const inputArea = document.getElementById('note-input');
+        if(inputArea) {
+            inputArea.innerText = sharedText;
+            alert("Text received from share!");
+        }
     }
 
     const inputArea = document.getElementById('note-input');
     if(inputArea) inputArea.addEventListener('dblclick', handleSmartHighlight);
 };
 
-// --- স্মার্ট এক্সপোর্ট (Web Share API) ---
-async function exportData() {
-    const dataStr = JSON.stringify({ notes, learnedWords }, null, 2);
-    const isoDate = new Date().toISOString().split('T')[0]; // ফরম্যাট: YYYY-MM-DD
-    const fileName = `SentVoc_${isoDate}.json`;
+// --- আপনার বন্ধুর দেওয়া স্মার্ট এক্সপোর্ট কোড ---
+async function smartExport() {
+    const data = JSON.stringify({notes, learnedWords}, null, 2);
+    const fileName = `SentVoc_Backup_${new Date().toISOString().slice(0,10)}.json`;
 
-    // যদি মোবাইল ব্রাউজার হয় এবং শেয়ার অপশন থাকে
-    if (navigator.share && navigator.canShare) {
-        const file = new File([dataStr], fileName, { type: "application/json" });
+    // ডিভাইসটি ফাইল শেয়ারিং সাপোর্ট করে কিনা চেক করা
+    if (navigator.canShare && navigator.share) {
+        const file = new File([data], fileName, { type: 'application/json' });
+        
         try {
             await navigator.share({
                 title: 'SentVoc Backup',
+                text: 'My vocabulary backup file',
                 files: [file]
             });
+            console.log('Shared successfully');
         } catch (err) {
-            console.log("Share failed, falling back to download.");
-            fallbackDownload(dataStr, fileName);
+            console.error('Sharing failed, falling back to download:', err);
+            downloadFile(data, fileName);
         }
     } else {
-        // পিসির জন্য সাধারণ ডাউনলোড
-        fallbackDownload(dataStr, fileName);
+        // পিসি বা সাধারণ ব্রাউজারের জন্য ডাউনলোড
+        downloadFile(data, fileName);
     }
 }
 
-function fallbackDownload(content, fileName) {
-    const blob = new Blob([content], { type: "application/json" });
+function downloadFile(content, name) {
+    const blob = new Blob([content], {type: "application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = fileName;
+    a.download = name;
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 
-// --- ইনপুট ও সেটিংস লজিক ---
+// --- সেটিংস ও ল্যাঙ্গুয়েজ সেটআপ ---
 function setupLanguages() {
     const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
+    if(!lSel) return;
     Object.entries(languages).forEach(([c, n]) => { 
         lSel.add(new Option(n, c)); 
         tSel.add(new Option(n, c)); 
@@ -70,7 +79,7 @@ function toggleSettings() {
     if(m) m.classList.toggle('hidden');
 }
 
-// --- লেআউট ও কার্ড ডিসপ্লে (v3.3 এর সেই ম্যাক্সিমাম স্পেস বজায় রাখা হয়েছে) ---
+// --- কার্ড ডিসপ্লে ও ডাইনামিক লেআউট (v3.3 থেকে সংরক্ষিত) ---
 function showCard() {
     const card = currentSessionCards[currentIndex];
     const content = document.getElementById('card-content');
@@ -102,7 +111,6 @@ function showCard() {
     }
 }
 
-// --- ফন্ট স্কেলিং ---
 function getDynamicFontSize(text, type) {
     const wordCount = text.split(/\s+/).length;
     if (type === 'word') {
@@ -119,7 +127,7 @@ function getDynamicFontSize(text, type) {
     }
 }
 
-// --- বাকি সব কোর ফিচার ---
+// --- বাকি সব ফিচার ---
 function handleSmartHighlight(e) {
     const selection = window.getSelection();
     if (!selection.rangeCount || selection.toString().trim() === "") return;
@@ -181,19 +189,6 @@ function showSection(s) {
     document.getElementById(s+'-view').classList.remove('hidden');
 }
 
-async function lookup(word) {
-    if (window.event) window.event.stopPropagation();
-    const modal = document.getElementById('dict-modal');
-    modal.classList.replace('hidden', 'flex');
-    const sl = document.getElementById('learn-lang').value, tl = document.getElementById('target-lang').value;
-    try {
-        const wRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(word)}`);
-        const wData = await wRes.json();
-        document.getElementById('dict-word').innerText = word;
-        document.getElementById('dict-meaning').innerText = wData[0][0][0];
-    } catch (e) { console.error(e); }
-}
-
 function applyTheme() {
     const saved = localStorage.getItem('theme');
     const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -216,6 +211,19 @@ function importData(e) {
         localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
         location.reload(); 
     }; r.readAsText(f); 
+}
+
+async function lookup(word) {
+    if (window.event) window.event.stopPropagation();
+    const modal = document.getElementById('dict-modal');
+    modal.classList.replace('hidden', 'flex');
+    const sl = document.getElementById('learn-lang').value, tl = document.getElementById('target-lang').value;
+    try {
+        const wRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(word)}`);
+        const wData = await wRes.json();
+        document.getElementById('dict-word').innerText = word;
+        document.getElementById('dict-meaning').innerText = wData[0][0][0];
+    } catch (e) { console.error(e); }
 }
 
 function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
