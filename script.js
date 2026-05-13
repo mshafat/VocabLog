@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v4.2 - The Perfect Hybrid (Final)
+// ভার্সন কোড নেম: SentVoc v4.3 - Stable (Audio Fix + ISO Date Export)
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -7,11 +7,18 @@ let currentSessionCards = [];
 let currentIndex = 0;
 let isFlipped = false;
 let isReviewingMastered = false;
+let iosAudioUnlocked = false; // আইফোন অডিও ট্র্যাকার
 
 window.onload = () => {
     applyTheme();
     setupLanguages();
     handleIncomingShare();
+
+    // আইফোন অডিও গেটওয়ে আনলক করা (v2.4 লজিক)
+    const unlockEvents = ['touchstart', 'click', 'keydown'];
+    unlockEvents.forEach(event => {
+        document.body.addEventListener(event, unlockIOSAudio, { once: true });
+    });
 
     const inputArea = document.getElementById('note-input');
     if(inputArea) {
@@ -19,7 +26,59 @@ window.onload = () => {
     }
 };
 
-// --- শেয়ার টেক্সট ক্লিনার (v4.0 logic) ---
+function unlockIOSAudio() {
+    if (iosAudioUnlocked) return;
+    window.speechSynthesis.cancel();
+    const silent = new SpeechSynthesisUtterance("");
+    window.speechSynthesis.speak(silent);
+    iosAudioUnlocked = true;
+    console.log("Audio Engine Unlocked for Mobile");
+}
+
+// --- অডিও ইঞ্জিন (v2.4 Hybrid: Cloud + System TTS) ---
+function speakText(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
+    const card = currentSessionCards[currentIndex];
+    if (!card) return;
+    
+    const textToSpeak = isFlipped ? card.sentence : card.word;
+    const langCode = document.getElementById('learn-lang').value;
+
+    window.speechSynthesis.cancel();
+
+    // Google Cloud TTS (Primary)
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&total=1&idx=0&textlen=${textToSpeak.length}&client=tw-ob`;
+    
+    const audio = new Audio();
+    audio.src = url;
+    audio.crossOrigin = "anonymous";
+
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.warn("Cloud TTS failed, using System TTS");
+            // System TTS (Fallback for iOS/Linux)
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.lang = langCode;
+            utterance.rate = 0.85; 
+            window.speechSynthesis.speak(utterance);
+        });
+    }
+}
+
+// --- সেটিংস ও শেয়ার লজিক ---
+function toggleSettings() {
+    const m = document.getElementById('settings-modal');
+    if (!m) return;
+    m.classList.toggle('hidden');
+    m.classList.toggle('flex');
+}
+
 function handleIncomingShare() {
     const urlParams = new URLSearchParams(window.location.search);
     const sharedText = urlParams.get('text');
@@ -27,43 +86,23 @@ function handleIncomingShare() {
     
     if (sharedText || sharedTitle) {
         let rawContent = (sharedText || "") + " " + (sharedTitle || "");
-        
         let cleanText = decodeURIComponent(rawContent)
             .replace(/(?:https?|ftp):\/\/[\n\S]+/g, '') 
             .replace(/["'“”]/g, '') 
             .replace(/\+/g, ' ')
             .trim();
 
-        // ডুপ্লিকেট টেক্সট ফিক্স (আপনার ব্রাউজার উদাহরণের জন্য)
-        const sentences = cleanText.split(". ");
-        if(sentences.length > 1 && sentences[0].includes(sentences[1])) {
-            cleanText = sentences[0];
-        } else {
-            const words = cleanText.split(/\s+/);
-            const mid = Math.floor(words.length / 2);
-            const firstHalf = words.slice(0, mid).join(" ");
-            const secondHalf = words.slice(mid).join(" ");
-            if (firstHalf === secondHalf) cleanText = firstHalf;
+        const words = cleanText.split(/\s+/);
+        const mid = Math.floor(words.length / 2);
+        if(words.slice(0, mid).join(" ") === words.slice(mid).join(" ")) {
+            cleanText = words.slice(0, mid).join(" ");
         }
 
         setTimeout(() => {
             const inputArea = document.getElementById('note-input');
-            if (inputArea) {
-                inputArea.innerText = cleanText;
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+            if (inputArea) inputArea.innerText = cleanText;
+            window.history.replaceState({}, document.title, window.location.pathname);
         }, 500);
-    }
-}
-
-// --- সেটিংস বাটন ফিক্স ---
-function toggleSettings() {
-    const m = document.getElementById('settings-modal');
-    if (!m) return;
-    if (m.classList.contains('hidden')) {
-        m.classList.replace('hidden', 'flex');
-    } else {
-        m.classList.replace('flex', 'hidden');
     }
 }
 
@@ -77,7 +116,6 @@ function showCard() {
     document.getElementById('prev-btn').disabled = currentIndex === 0;
     
     if (isFlipped) {
-        // v4.0 Bold Sentence Style
         content.className = "text-2xl font-bold text-slate-700 dark:text-slate-300 leading-snug text-center p-2";
         const regex = new RegExp(`(${card.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         content.innerHTML = card.sentence.replace(regex, "___MARK___$1___END___").split(/\s+/).map(p => {
@@ -86,46 +124,28 @@ function showCard() {
             return `<span class="cursor-pointer text-indigo-500 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
         }).join(" ");
     } else {
-        // v4.0 Big Bold Word Style
         content.innerText = card.word;
         content.className = "text-5xl font-black text-slate-800 dark:text-white uppercase tracking-tighter text-center";
     }
 }
 
-// --- মাস্টারড ও লার্নড লিস্ট (v2.4 Logic) ---
+// --- মাস্টারড ও সেশন লজিক (v2.4) ---
 function markAsLearned() {
-    if(!confirm("আয়ত্ত করেছেন? এটি লার্নড লিস্টে চলে যাবে।")) return;
-    
-    const card = currentSessionCards[currentIndex];
-    learnedWords.push(card);
+    if(!confirm("আয়ত্ত করেছেন? এটি মাস্টারড লিস্টে চলে যাবে।")) return;
+    learnedWords.push(currentSessionCards[currentIndex]);
     localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
-    
     currentSessionCards.splice(currentIndex, 1);
-    
-    if (currentSessionCards.length === 0) {
-        alert("সেশন শেষ!");
-        showSection('input');
-    } else {
-        if(currentIndex >= currentSessionCards.length) currentIndex--;
-        isFlipped = false;
-        showCard();
-    }
+    if (currentSessionCards.length === 0) showSection('input'); 
+    else { if(currentIndex >= currentSessionCards.length) currentIndex--; isFlipped = false; showCard(); }
 }
 
 function renderLearnedList() {
     const list = document.getElementById('learned-list');
-    if(!list) return;
-    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400 opacity-50">Mastered list is empty.</p>' : '';
-    
-    [...learnedWords].reverse().forEach((lw) => {
+    list.innerHTML = learnedWords.length === 0 ? '<p class="text-center py-10 text-slate-400 opacity-50">Mastered list empty.</p>' : '';
+    [...learnedWords].reverse().forEach(lw => {
         const div = document.createElement('div');
         div.className = "bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3 border-l-4 border-green-500";
-        div.innerHTML = `
-            <div>
-                <p class="font-black text-indigo-600 dark:text-indigo-400 uppercase text-lg">${lw.word}</p>
-                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">${lw.sentence}</p>
-            </div>
-        `;
+        div.innerHTML = `<p class="font-black text-indigo-600 dark:text-indigo-400 uppercase text-lg">${lw.word}</p><p class="text-sm text-slate-500 dark:text-slate-400 mt-1">${lw.sentence}</p>`;
         list.appendChild(div);
     });
 }
@@ -133,7 +153,6 @@ function renderLearnedList() {
 function startRepeat(mode) {
     currentSessionCards = [];
     isReviewingMastered = (mode === 'mastered');
-    
     if (isReviewingMastered) {
         currentSessionCards = [...learnedWords];
     } else {
@@ -148,20 +167,27 @@ function startRepeat(mode) {
             });
         });
     }
-    
     if (currentSessionCards.length === 0) return alert("কোন কার্ড নেই!");
-    
     currentSessionCards.sort(() => Math.random() - 0.5);
     currentIndex = 0; isFlipped = false;
-    
-    const mBtn = document.getElementById('mastered-btn');
-    if(mBtn) mBtn.style.display = isReviewingMastered ? 'none' : 'block';
-    
-    showCard(); 
-    showSection('repeat');
+    document.getElementById('mastered-btn').style.display = isReviewingMastered ? 'none' : 'block';
+    showCard(); showSection('repeat');
 }
 
-// --- ইউটিলিটি ফাংশনস ---
+// --- এক্সপোর্ট (ISO Date Name Fix) ---
+function exportData() {
+    const data = JSON.stringify({notes, learnedWords});
+    const isoDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const fileName = `SentVoc_Backup_${isoDate}.json`;
+    
+    const blob = new Blob([data], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+}
+
+// --- অন্যান্য ফাংশন ---
 function showSection(s) {
     document.querySelectorAll('#input-view, #repeat-view, #learned-view').forEach(e => e.classList.add('hidden'));
     if(s === 'learned') renderLearnedList();
@@ -194,7 +220,6 @@ function handleSmartHighlight() {
     span.innerText = sel.toString().trim();
     range.deleteContents();
     range.insertNode(span);
-    window.getSelection().removeAllRanges();
 }
 
 async function lookup(word) {
@@ -229,12 +254,6 @@ function applyTheme() {
     document.documentElement.classList.toggle('dark', isDark);
 }
 
-function exportData() { 
-    const blob = new Blob([JSON.stringify({notes, learnedWords})], {type: "application/json"}); 
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); 
-    a.download = `SentVoc_v4.2_Backup.json`; a.click(); 
-}
-
 function importData(e) { 
     const f = e.target.files[0]; if(!f)return; 
     const r = new FileReader(); r.onload = (ev) => { 
@@ -243,6 +262,6 @@ function importData(e) { 
             localStorage.setItem('sentvoc_notes', JSON.stringify(d.notes || {})); 
             localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
             location.reload(); 
-        } catch(e) { alert("ভুল ফাইল!"); }
+        } catch(e) { alert("Invalid File!"); }
     }; r.readAsText(f); 
 }
