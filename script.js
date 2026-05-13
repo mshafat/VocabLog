@@ -1,4 +1,4 @@
-// ভার্সন কোড নেম: SentVoc v4.3 - Stable (Audio Fix + ISO Date Export)
+// ভার্সন কোড নেম: SentVoc v4.4 - Night Mode Fixed & Stable
 const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
 
 let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
@@ -7,14 +7,14 @@ let currentSessionCards = [];
 let currentIndex = 0;
 let isFlipped = false;
 let isReviewingMastered = false;
-let iosAudioUnlocked = false; // আইফোন অডিও ট্র্যাকার
+let iosAudioUnlocked = false;
 
 window.onload = () => {
     applyTheme();
     setupLanguages();
     handleIncomingShare();
 
-    // আইফোন অডিও গেটওয়ে আনলক করা (v2.4 লজিক)
+    // আইফোন অডিও গেটওয়ে আনলক
     const unlockEvents = ['touchstart', 'click', 'keydown'];
     unlockEvents.forEach(event => {
         document.body.addEventListener(event, unlockIOSAudio, { once: true });
@@ -26,43 +26,47 @@ window.onload = () => {
     }
 };
 
+// --- থিম ইঞ্জিন (v4.4 ফিক্স) ---
+function applyTheme() {
+    const saved = localStorage.getItem('theme');
+    const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', isDark);
+    const icon = document.getElementById('theme-icon');
+    if(icon) icon.innerText = isDark ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    const icon = document.getElementById('theme-icon');
+    if(icon) icon.innerText = isDark ? '☀️' : '🌙';
+}
+
+// --- অডিও ইঞ্জিন (v2.4 Hybrid) ---
 function unlockIOSAudio() {
     if (iosAudioUnlocked) return;
     window.speechSynthesis.cancel();
     const silent = new SpeechSynthesisUtterance("");
     window.speechSynthesis.speak(silent);
     iosAudioUnlocked = true;
-    console.log("Audio Engine Unlocked for Mobile");
 }
 
-// --- অডিও ইঞ্জিন (v2.4 Hybrid: Cloud + System TTS) ---
 function speakText(event) {
-    if (event) {
-        event.stopPropagation();
-        event.preventDefault();
-    }
-    
+    if (event) { event.stopPropagation(); event.preventDefault(); }
     const card = currentSessionCards[currentIndex];
     if (!card) return;
-    
     const textToSpeak = isFlipped ? card.sentence : card.word;
     const langCode = document.getElementById('learn-lang').value;
 
     window.speechSynthesis.cancel();
-
-    // Google Cloud TTS (Primary)
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textToSpeak)}&tl=${langCode}&total=1&idx=0&textlen=${textToSpeak.length}&client=tw-ob`;
-    
     const audio = new Audio();
     audio.src = url;
     audio.crossOrigin = "anonymous";
 
     const playPromise = audio.play();
-
     if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            console.warn("Cloud TTS failed, using System TTS");
-            // System TTS (Fallback for iOS/Linux)
+        playPromise.catch(() => {
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.lang = langCode;
             utterance.rate = 0.85; 
@@ -71,12 +75,13 @@ function speakText(event) {
     }
 }
 
-// --- সেটিংস ও শেয়ার লজিক ---
+// --- শেয়ার ও সেটিংস লজিক ---
 function toggleSettings() {
     const m = document.getElementById('settings-modal');
-    if (!m) return;
-    m.classList.toggle('hidden');
-    m.classList.toggle('flex');
+    if (m) {
+        m.classList.toggle('hidden');
+        m.classList.toggle('flex');
+    }
 }
 
 function handleIncomingShare() {
@@ -174,12 +179,11 @@ function startRepeat(mode) {
     showCard(); showSection('repeat');
 }
 
-// --- এক্সপোর্ট (ISO Date Name Fix) ---
+// --- এক্সপোর্ট ও ইমপোর্ট (ISO Date) ---
 function exportData() {
     const data = JSON.stringify({notes, learnedWords});
-    const isoDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const isoDate = new Date().toISOString().split('T')[0];
     const fileName = `SentVoc_Backup_${isoDate}.json`;
-    
     const blob = new Blob([data], {type: "application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -187,7 +191,19 @@ function exportData() {
     a.click();
 }
 
-// --- অন্যান্য ফাংশন ---
+function importData(e) { 
+    const f = e.target.files[0]; if(!f)return; 
+    const r = new FileReader(); r.onload = (ev) => { 
+        try {
+            const d = JSON.parse(ev.target.result); 
+            localStorage.setItem('sentvoc_notes', JSON.stringify(d.notes || {})); 
+            localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
+            location.reload(); 
+        } catch(e) { alert("Invalid File!"); }
+    }; r.readAsText(f); 
+}
+
+// --- কোর নেভিগেশন ---
 function showSection(s) {
     document.querySelectorAll('#input-view, #repeat-view, #learned-view').forEach(e => e.classList.add('hidden'));
     if(s === 'learned') renderLearnedList();
@@ -246,22 +262,4 @@ function setupLanguages() {
     });
     lSel.value = localStorage.getItem('pref_learn') || "ur";
     tSel.value = localStorage.getItem('pref_target') || "bn";
-}
-
-function applyTheme() {
-    const saved = localStorage.getItem('theme');
-    const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.classList.toggle('dark', isDark);
-}
-
-function importData(e) { 
-    const f = e.target.files[0]; if(!f)return; 
-    const r = new FileReader(); r.onload = (ev) => { 
-        try {
-            const d = JSON.parse(ev.target.result); 
-            localStorage.setItem('sentvoc_notes', JSON.stringify(d.notes || {})); 
-            localStorage.setItem('sentvoc_learned', JSON.stringify(d.learnedWords || [])); 
-            location.reload(); 
-        } catch(e) { alert("Invalid File!"); }
-    }; r.readAsText(f); 
 }
