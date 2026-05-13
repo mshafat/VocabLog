@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SentVoc v5.0</title>
+    <title>SentVoc v4.6</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -19,7 +26,7 @@
     <div id="app" class="max-w-md mx-auto p-4 pb-10">
         <header class="flex justify-between items-center py-6">
             <h1 onclick="showSection('input')" class="text-2xl font-black text-indigo-600 cursor-pointer select-none">
-                SentVoc <span class="text-[10px] bg-indigo-100 dark:bg-indigo-900 px-2 py-0.5 rounded ml-1">v5.0</span>
+                SentVoc <span class="text-[10px] bg-indigo-100 dark:bg-indigo-900 px-2 py-0.5 rounded ml-1">v4.6</span>
             </h1>
             <div class="flex items-center space-x-4">
                 <button onclick="toggleTheme()" class="text-xl bg-white dark:bg-slate-800 w-10 h-10 rounded-full shadow-sm flex items-center justify-center border border-slate-200 dark:border-slate-700">
@@ -30,13 +37,12 @@
             </div>
         </header>
 
-        <!-- Input View -->
         <div id="input-view" class="space-y-4">
             <div class="relative">
                 <button id="bold-tool" onclick="makeBold()" class="hidden absolute -top-12 left-0 bg-indigo-600 text-white text-xs px-4 py-2 rounded-full shadow-lg z-20 font-bold">
                     ✨ Highlight Word
                 </button>
-                <div id="note-input" contenteditable="true" onmouseup="handleSelection()" class="w-full p-6 min-h-[220px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all text-xl leading-relaxed overflow-y-auto rtl-auto" placeholder="Paste or type text here..."></div>
+                <div id="note-input" contenteditable="true" onselect="handleSelection()" onmouseup="handleSelection()" class="w-full p-6 min-h-[220px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-sm outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all text-xl leading-relaxed overflow-y-auto rtl-auto" placeholder="Paste or type text here..."></div>
             </div>
             <button onclick="saveNote()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">Save Card</button>
             
@@ -47,7 +53,6 @@
             </div>
         </div>
 
-        <!-- Repeat View -->
         <div id="repeat-view" class="hidden">
             <div class="flex justify-between items-center mb-6 px-2">
                 <div id="card-progress" class="text-slate-400 font-bold text-xs">0 / 0</div>
@@ -71,7 +76,6 @@
             </div>
         </div>
 
-        <!-- Learned View -->
         <div id="learned-view" class="hidden">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold">Mastered Words</h2>
@@ -82,7 +86,6 @@
         </div>
     </div>
 
-    <!-- Modals -->
     <div id="settings-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center p-6 backdrop-blur-sm z-[60]">
         <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] w-full max-w-xs shadow-2xl border border-slate-200 dark:border-slate-800">
             <h2 class="font-bold text-xl mb-6 text-center text-indigo-600">Settings</h2>
@@ -98,7 +101,7 @@
                 <button onclick="exportData()" class="w-full bg-slate-100 dark:bg-slate-800 py-3 rounded-xl text-sm font-bold">📤 Export Backup</button>
                 <label class="w-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 py-3 rounded-xl text-sm font-bold text-center block cursor-pointer">
                     📥 Import Backup
-                    <input type="file" class="hidden" onchange="importData(event)">
+                    <input type="file" id="importFile" class="hidden" onchange="importData(event)">
                 </label>
             </div>
             <button onclick="toggleSettings()" class="mt-8 w-full py-3 text-slate-500 font-bold text-sm border-t border-slate-100 dark:border-slate-800">Close Settings</button>
@@ -119,245 +122,6 @@
         </div>
     </div>
 
-    <script>
-        // --- Core Variables ---
-        const languages = { "en": "English", "bn": "Bengali", "ur": "Urdu", "ar": "Arabic", "es": "Spanish", "fr": "French", "de": "German", "hi": "Hindi", "tr": "Turkish", "ru": "Russian", "fa": "Persian" };
-        let notes = JSON.parse(localStorage.getItem('sentvoc_notes')) || {};
-        let learnedWords = JSON.parse(localStorage.getItem('sentvoc_learned')) || [];
-        let currentSessionCards = [];
-        let currentIndex = 0;
-        let isFlipped = false;
-
-        window.onload = () => {
-            applyTheme();
-            setupLanguages();
-            showSection('input');
-        };
-
-        // --- Navigation ---
-        function showSection(s) {
-            document.getElementById('input-view').classList.add('hidden');
-            document.getElementById('repeat-view').classList.add('hidden');
-            document.getElementById('learned-view').classList.add('hidden');
-            document.getElementById(s + '-view').classList.remove('hidden');
-            if(s === 'learned') renderLearnedList();
-        }
-
-        function toggleSettings() {
-            const m = document.getElementById('settings-modal');
-            m.classList.toggle('hidden');
-            m.classList.toggle('flex');
-        }
-
-        // --- Highlight & Selection ---
-        function handleSelection() {
-            const sel = window.getSelection();
-            const tool = document.getElementById('bold-tool');
-            if (sel.toString().trim().length > 0) {
-                tool.classList.remove('hidden');
-            } else {
-                tool.classList.add('hidden');
-            }
-        }
-
-        function makeBold() {
-            const sel = window.getSelection();
-            if (!sel.rangeCount) return;
-            const range = sel.getRangeAt(0);
-            const span = document.createElement('span');
-            span.className = "vocab-word text-indigo-600 dark:text-indigo-400 font-black underline decoration-2 underline-offset-4";
-            span.innerText = sel.toString().trim();
-            range.deleteContents();
-            range.insertNode(span);
-            document.getElementById('bold-tool').classList.add('hidden');
-        }
-
-        // --- Save Logic ---
-        function saveNote() {
-            const input = document.getElementById('note-input');
-            const words = input.querySelectorAll('.vocab-word');
-            if (words.length === 0) return alert("Highlight a word first!");
-            const date = new Date().toLocaleDateString();
-            if (!notes[date]) notes[date] = [];
-            words.forEach(w => {
-                notes[date].push({
-                    word: w.innerText.trim(),
-                    sentence: input.innerText.trim(),
-                    id: Date.now() + Math.random(),
-                    timestamp: Date.now()
-                });
-            });
-            localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
-            input.innerHTML = "";
-            alert("Card Saved!");
-        }
-
-        // --- Card Engine ---
-        function startRepeat(mode) {
-            currentSessionCards = [];
-            const allNotes = Object.values(notes).flat();
-            if (mode === 'mastered') {
-                currentSessionCards = [...learnedWords];
-            } else {
-                const now = Date.now();
-                allNotes.forEach(c => {
-                    if(learnedWords.some(l => l.id === c.id)) return;
-                    const age = now - c.timestamp;
-                    if (mode === 'today' && age <= 86400000) currentSessionCards.push(c);
-                    else if (mode === 'week' && age <= 604800000) currentSessionCards.push(c);
-                    else if (mode === 'all') currentSessionCards.push(c);
-                });
-            }
-            if (currentSessionCards.length === 0) return alert("No cards found!");
-            currentSessionCards.sort(() => Math.random() - 0.5);
-            currentIndex = 0; isFlipped = false;
-            document.getElementById('mastered-btn').style.display = (mode === 'mastered') ? 'none' : 'block';
-            showCard();
-            showSection('repeat');
-        }
-
-        function showCard() {
-            const card = currentSessionCards[currentIndex];
-            const content = document.getElementById('card-content');
-            document.getElementById('card-progress').innerText = `${currentIndex + 1} / ${currentSessionCards.length}`;
-            
-            if (isFlipped) {
-                content.className = "text-2xl font-bold text-slate-700 dark:text-slate-300 leading-snug text-center p-2";
-                const regex = new RegExp(`(${card.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-                content.innerHTML = card.sentence.replace(regex, "___MARK___$1___END___").split(/\s+/).map(p => {
-                    const clean = p.replace("___MARK___", "").replace("___END___", "").replace(/[.,!?।]/g, "");
-                    if (p.includes("___MARK___")) return `<mark class="bg-yellow-200 dark:bg-yellow-500/50 px-1 rounded font-black italic cursor-pointer" onclick="lookup('${clean}')">${p.replace("___MARK___", "").replace("___END___", "")}</mark>`;
-                    return `<span class="cursor-pointer text-indigo-500 hover:underline" onclick="lookup('${clean}')">${p}</span>`;
-                }).join(" ");
-            } else {
-                content.innerText = card.word;
-                content.className = "text-5xl font-black text-slate-800 dark:text-white uppercase tracking-tighter text-center";
-            }
-        }
-
-        function flipCard() { isFlipped = !isFlipped; showCard(); }
-        function nextCard() { if (currentIndex < currentSessionCards.length - 1) { currentIndex++; isFlipped = false; showCard(); } else { alert("Session Done!"); showSection('input'); } }
-        function prevCard() { if (currentIndex > 0) { currentIndex--; isFlipped = false; showCard(); } }
-
-        // --- Dictionary & Translation (The Fixed Logic) ---
-        async function lookup(word) {
-            if (window.event) window.event.stopPropagation();
-            const modal = document.getElementById('dict-modal');
-            modal.classList.replace('hidden', 'flex');
-            document.getElementById('dict-word').innerText = word;
-            document.getElementById('dict-meaning').innerText = "Translating...";
-            document.getElementById('sentence-meaning').innerText = "...";
-
-            const sl = document.getElementById('learn-lang').value;
-            const tl = document.getElementById('target-lang').value;[cite: 1]
-            const card = currentSessionCards[currentIndex];
-
-            try {
-                // Word Meaning
-                const wRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(word)}`);
-                const wData = await wRes.json();
-                document.getElementById('dict-meaning').innerText = wData[0][0][0];
-
-                // Sentence Translation (The Fix)
-                if(card && card.sentence) {
-                    const sRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURI(card.sentence)}`);[cite: 1]
-                    const sData = await sRes.json();
-                    document.getElementById('sentence-meaning').innerText = sData[0][0][0];
-                }
-            } catch (e) {
-                document.getElementById('dict-meaning').innerText = "Error loading translation.";
-            }
-        }
-
-        function closeModal() { document.getElementById('dict-modal').classList.replace('flex', 'hidden'); }
-
-        // --- Mastered Logic ---
-        function markAsLearned() {
-            if(!confirm("Move to mastered?")) return;
-            learnedWords.push(currentSessionCards[currentIndex]);
-            localStorage.setItem('sentvoc_learned', JSON.stringify(learnedWords));
-            currentSessionCards.splice(currentIndex, 1);
-            if (currentSessionCards.length === 0) showSection('input');
-            else { if(currentIndex >= currentSessionCards.length) currentIndex--; isFlipped = false; showCard(); }
-        }
-
-        function renderLearnedList() {
-            const list = document.getElementById('learned-list');
-            list.innerHTML = learnedWords.map(lw => `
-                <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm border-l-4 border-green-500">
-                    <p class="font-black text-indigo-600 dark:text-indigo-400 uppercase text-lg">${lw.word}</p>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">${lw.sentence}</p>
-                </div>
-            `).join('');
-        }
-
-        // --- Settings & Utils ---
-        function setupLanguages() {
-            const lSel = document.getElementById('learn-lang'), tSel = document.getElementById('target-lang');
-            Object.entries(languages).forEach(([c, n]) => {
-                lSel.add(new Option(n, c));
-                tSel.add(new Option(n, c));
-            });
-            lSel.value = localStorage.getItem('pref_learn') || "ur";
-            tSel.value = localStorage.getItem('pref_target') || "bn";
-            lSel.onchange = () => localStorage.setItem('pref_learn', lSel.value);
-            tSel.onchange = () => localStorage.setItem('pref_target', tSel.value);
-        }
-
-        function toggleTheme() {
-            const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
-        }
-
-        function applyTheme() {
-            const isDark = localStorage.getItem('theme') === 'dark';
-            document.documentElement.classList.toggle('dark', isDark);
-            document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
-        }
-
-        function exportData() {
-            const data = JSON.stringify({notes, learnedWords});
-            const blob = new Blob([data], {type: "application/json"});
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `SentVoc_Backup_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-        }
-
-        function importData(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const data = JSON.parse(ev.target.result);
-                localStorage.setItem('sentvoc_notes', JSON.stringify(data.notes));
-                localStorage.setItem('sentvoc_learned', JSON.stringify(data.learnedWords));
-                location.reload();
-            };
-            reader.readAsText(file);
-        }
-
-        function deleteCurrentCard() {
-            if(!confirm("Delete this card forever?")) return;
-            const card = currentSessionCards[currentIndex];
-            // Remove from notes
-            for(let date in notes) {
-                notes[date] = notes[date].filter(n => n.id !== card.id);
-            }
-            localStorage.setItem('sentvoc_notes', JSON.stringify(notes));
-            currentSessionCards.splice(currentIndex, 1);
-            if (currentSessionCards.length === 0) showSection('input');
-            else { if(currentIndex >= currentSessionCards.length) currentIndex--; isFlipped = false; showCard(); }
-        }
-
-        function speakText(event) {
-            event.stopPropagation();
-            const card = currentSessionCards[currentIndex];
-            const text = isFlipped ? card.sentence : card.word;
-            const ut = new SpeechSynthesisUtterance(text);
-            ut.lang = document.getElementById('learn-lang').value;
-            window.speechSynthesis.speak(ut);
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
